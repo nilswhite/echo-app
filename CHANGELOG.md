@@ -1,0 +1,42 @@
+# Changelog
+
+All notable changes to Echo are tracked in this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Echo adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] — 2026-05-02
+
+First shippable release. Tray-resident macOS app that records meetings (or quick text notes) via global hotkey, transcribes them with OpenAI Whisper, structures the result with Claude or GPT, and drops a Markdown file directly into a folder of your choosing — designed for piping into an Obsidian vault inbox, but works with any folder.
+
+### Added
+- **Tray-resident lifecycle** — no main window; menu-bar icon + global hotkey (`Cmd+Shift+A` by default, configurable) is the only persistent UI
+- **Single-instance lock** so a second Electron process can never race the first one for the microphone
+- **Capture window** — frameless, always-on-top, multi-line textarea that fills the available space and scrolls vertically. `Enter` saves a quick note; `Shift+Enter` inserts a newline; `Esc` dismisses
+- **Recording pill** — pressing Record collapses the window to a Granola-style 192×52 floating pill that drags anywhere on screen and remembers its last position. Live mic level meter, silence-detection warning, recording duration counter
+- **Pill title input** — a thin chevron strip below the pill expands a title row where you can type a meeting title mid-recording. The typed title overrides the AI-generated one in the final note
+- **Minimize-to-pill button** — top-right corner of the full window, only visible during an active recording; click returns to the pill without stopping the recording
+- **Mic device selection** — submenu in the tray icon lists every audio input device with a checkmark on the active one, plus an in-window picker. Selection persists in `settings.json`
+- **Embedded Express server** on `127.0.0.1:3739`, fire-and-forget pipeline so closing the capture window never loses an in-flight transcription
+- **OpenAI Whisper transcription** with `ffmpeg-static`-based chunking for files over the 25 MB API limit, plus a hallucination filter for silence-induced false transcripts
+- **Provider-agnostic structuring** — choose Anthropic Claude or OpenAI GPT in Settings; the model dropdown is fetched live from each provider's `/v1/models` API and cached for 24h with a manual refresh button
+- **Atomic Markdown writes** — temp file + rename, so iCloud Drive / Obsidian Sync never sees a partial file. Filename pattern `YYYY-MM-DD-HHmm-<slug>-<hash>.md`
+- **Audio attachments** — when the "Keep audio" toggle is on, the original recording is copied to `_attachments/` next to the Markdown file with an Obsidian wikilink in the body
+- **Failure resilience** — any transcription error writes a flagged Markdown stub with `status: error` in the frontmatter, a `> [!warning]` callout, and the audio preserved so nothing is lost silently
+- **Theme system** — Light (Strata's *Parchment*), Dark (Strata's *Electron Vue*), or System. Three-icon toggle in the Settings titlebar; capture window, pill, mic picker, and Settings all respond to the choice in real time
+- **Quick-text-note path** — `Cmd+Shift+A`, type, `Enter` saves a Markdown file with no transcript section. Optional Claude/GPT cleanup pass via the `cleanQuickNotes` toggle
+- **Tray menu** — Capture, Microphone submenu, Settings, Reveal Output Folder, Quit Echo
+- **Hand-rasterized icons** — `trayTemplate.png` (template image, auto-tinted by macOS menu bar) and `icon.icns` (full-color squircle for the dock), both built by zero-dependency PNG encoders in `scripts/`
+- **electron-forge build** — `npm run electron:make` produces a working `.dmg` (~138 MB) with `ffmpeg-static` correctly placed in `app.asar.unpacked/` so the binary is executable in the packaged app
+- **MIT license**
+
+### Known limitations
+- **macOS arm64 only** — no Intel build target configured (easy to add)
+- **Not code-signed or notarized** — first launch requires right-click → Open to bypass Gatekeeper
+- **Mic only, no system audio** — meetings record only your local mic, not the remote participants' audio. Tracking via [issue ID-001](_docs/issue-backlog.md) for v1.1+
+- **No speaker diarization** — single-speaker transcripts. Tracking via ID-003
+- **No auto-update** — reinstall the DMG to upgrade
+
+### Provenance
+Forked architecturally from Strata (a private companion app) — the recording pipeline, capture window, pill UX, and theme variables were ported verbatim where they were already battle-tested. ID-150 in Strata's own backlog originally specified this derivative.
+
+[1.0.0]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.0

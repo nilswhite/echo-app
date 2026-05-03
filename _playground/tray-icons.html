@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Echo — Tray Icon Playground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --surface: #111827;
+      --surface-hover: #172035;
+      --border: #1e2a45;
+      --border-light: #2a3a5c;
+      --text: #d4daf0;
+      --text-dim: #8892b0;
+      --text-faint: #5a6580;
+      --accent: #64d2ff;
+      --green: #c3e88d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 32px 40px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.01em; }
+    .lede { color: var(--text-dim); font-size: 13px; max-width: 720px; margin-bottom: 28px; }
+    .lede code { font-family: 'IBM Plex Mono'; font-size: 12px; background: var(--surface); padding: 1px 6px; border-radius: 4px; }
+
+    /* Two backgrounds — light and dark menu bar — to preview template image behavior */
+    .preview-bar { display: flex; gap: 32px; margin-bottom: 32px; }
+    .menu-bar {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .menu-bar.light { background: linear-gradient(#f7f7f9, #e6e7eb); color: #2a2a30; }
+    .menu-bar.dark  { background: linear-gradient(#2a2a30, #1c1c20); color: #d6d6dd; }
+    .menu-bar .label { font-size: 11px; opacity: 0.55; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600; color: var(--text);
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .card-title .num { color: var(--text-faint); font-family: 'IBM Plex Mono'; font-size: 11px; }
+    .card-desc { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+    .row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .row .light, .row .dark {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center;
+      height: 44px;
+      border-radius: 6px;
+    }
+    .row .light { background: linear-gradient(#f7f7f9, #e6e7eb); color: #2a2a30; }
+    .row .dark  { background: linear-gradient(#2a2a30, #1c1c20); color: #d6d6dd; }
+    .icon { display: inline-flex; align-items: center; justify-content: center; }
+    .size16 svg, .size16 img, .size16 div.glyph { width: 16px; height: 16px; }
+    .size22 svg, .size22 img, .size22 div.glyph { width: 22px; height: 22px; }
+
+    .pick {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .pick button {
+      padding: 4px 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .pick button:hover { color: var(--accent); border-color: var(--accent); }
+    .picked { color: var(--green) !important; border-color: var(--green) !important; }
+
+    .footer {
+      margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border);
+      font-size: 12px; color: var(--text-dim);
+    }
+    .footer code { font-family: 'IBM Plex Mono'; background: var(--surface); padding: 2px 6px; border-radius: 4px; color: var(--text); }
+  </style>
+</head>
+<body>
+  <h1>Echo — Tray Icon Playground</h1>
+  <p class="lede">macOS tray icons render at <code>16×16</code> (regular) and <code>22×22</code> (Retina), and they're displayed as <code>NSTemplateImage</code> — meaning the OS auto-tints them: dark in light menu bars, light in dark menu bars. Each option below is shown at both sizes against light + dark backgrounds. Click <strong>Pick</strong> on the one you want and tell me; I'll cut a real PNG and wire it into the tray.</p>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="footer">
+    Concept space: each variant plays on the name <strong>Echo</strong> — soundwaves, ripples, concentric circles, or the letter E itself. Final asset will be a 22×22 black PNG (template image). Once you pick, I'll generate it via SVG-to-PNG and drop it at <code>electron/assets/trayTemplate.png</code>.
+  </div>
+
+  <script>
+    // Each icon is defined as a function that returns an SVG string at a given size.
+    // currentColor is set to black for light backgrounds and white for dark ones,
+    // simulating macOS's NSTemplateImage tinting behavior.
+    const ICONS = [
+      {
+        name: 'Concentric Echo',
+        desc: 'Three concentric circles — the visual definition of an echo radiating outward. Bold center, fading rings.',
+        svg: (s) => `<svg viewBox="0 0 22 22" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+          <circle cx="11" cy="11" r="2.5" fill="currentColor"/>
+          <circle cx="11" cy="11" r="5.5" opacity="0.7"/>
+          <circle cx="11" cy="11" r="9" opacity="0.4"/>
+        </svg>`,
+      },
+      {
+        name: 'Sound wave',
+        desc: 'A symmetric audio waveform — five bars of varying height. Reads instantly as "audio app".',
+        svg: (s) => `<svg viewBox="0 0 22 22" width="${s}" height="${s}" fill="currentColor">
+          <rect x="2"  y="9"   width="2.4" height="4"  rx="1"/>
+          <rect x="6"  y="6.5" width="2.4" height="9"  rx="1"/>
+          <rect x="10" y="3.5" width="2.4" height="15" rx="1"/>
+          <rect x="14" y="6.5" width="2.4" height="9"  rx="1"/>
+          <rect x="18" y="9"   width="2.4" height="4"  rx="1"/>
+        </svg>`,
+      },
+      {
+        name: 'Mic + ripple',
+        desc: 'A microphone with one ripple arc emanating from it — speaks to the recording function directly.',
+        svg: (s) => `<svg viewBox="0 0 22 22" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <rect x="9" y="3" width="4" height="9" rx="2" fill="currentColor"/>
+          <path d="M5 11.5c0 3.3 2.7 6 6 6s6-2.7 6-6"/>
+          <line x1="11" y1="17.5" x2="11" y2="20.5"/>
+        </svg>`,
+      },
+      {
+        name: 'Ripple-only',
+        desc: 'Two arcing curves like ripples on water — abstract and minimal. Does not literally show audio.',
+        svg: (s) => `<svg viewBox="0 0 22 22" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M3 11c2.5 -3 5 -3 8 0s5.5 3 8 0"/>
+          <path d="M3 16c2.5 -3 5 -3 8 0s5.5 3 8 0" opacity="0.55"/>
+        </svg>`,
+      },
+      {
+        name: 'Letter E (geometric)',
+        desc: 'A clean geometric "E" with three horizontal strokes evoking an equalizer. Wordmark + waveform fusion.',
+        svg: (s) => `<svg viewBox="0 0 22 22" width="${s}" height="${s}" fill="currentColor">
+          <rect x="4" y="4"    width="14" height="2.4" rx="1.2"/>
+          <rect x="4" y="9.8"  width="11" height="2.4" rx="1.2"/>
+          <rect x="4" y="15.6" width="14" height="2.4" rx="1.2"/>
+          <rect x="3" y="4"    width="2.4" height="14" rx="1.2"/>
+        </svg>`,
+      },
+      {
+        name: 'Pulse dot',
+        desc: 'A small filled dot inside two pulse rings, like a heartbeat or recording indicator.',
+        svg: (s) => `<svg viewBox="0 0 22 22" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.4">
+          <circle cx="11" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+          <circle cx="11" cy="11" r="5"/>
+          <circle cx="11" cy="11" r="8.5" opacity="0.5"/>
+        </svg>`,
+      },
+      {
+        name: 'Asymmetric ripple',
+        desc: 'A single source dot with one expanding arc — captures the directional nature of an echo.',
+        svg: (s) => `<svg viewBox="0 0 22 22" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="6" cy="11" r="2" fill="currentColor"/>
+          <path d="M10 6.5 a5.5 5.5 0 0 1 0 9" opacity="0.85"/>
+          <path d="M13.5 4.5 a8 8 0 0 1 0 13" opacity="0.5"/>
+        </svg>`,
+      },
+      {
+        name: 'Headphone wave',
+        desc: 'Stylized headphones with an inner wave — evokes "listening" rather than "speaking".',
+        svg: (s) => `<svg viewBox="0 0 22 22" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3.5 13a7.5 7.5 0 0 1 15 0"/>
+          <rect x="2.5" y="12.5" width="3.5" height="6" rx="1.5" fill="currentColor"/>
+          <rect x="16"  y="12.5" width="3.5" height="6" rx="1.5" fill="currentColor"/>
+        </svg>`,
+      },
+    ];
+
+    const grid = document.getElementById('grid');
+    ICONS.forEach((icon, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-title"><span class="num">${String(i + 1).padStart(2, '0')}</span>${icon.name}</div>
+        <div class="card-desc">${icon.desc}</div>
+        <div class="row">
+          <div class="light size16">${icon.svg(16)}</div>
+          <div class="dark  size16">${icon.svg(16)}</div>
+        </div>
+        <div class="row">
+          <div class="light size22">${icon.svg(22)}</div>
+          <div class="dark  size22">${icon.svg(22)}</div>
+        </div>
+        <div class="pick"><button data-pick="${i + 1}">Pick #${i + 1}</button></div>
+      `;
+      grid.appendChild(card);
+    });
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-pick]');
+      if (!btn) return;
+      document.querySelectorAll('.pick button').forEach((b) => b.classList.remove('picked'));
+      btn.classList.add('picked');
+      btn.textContent = `Picked — tell Claude #${btn.dataset.pick}`;
+    });
+  </script>
+</body>
+</html>

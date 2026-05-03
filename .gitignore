@@ -1,0 +1,16 @@
+node_modules/
+electron-dist/
+out/
+dist/
+*.log
+.DS_Store
+
+# Local Claude state
+.claude/settings.local.json
+
+# Local userData artifacts (Echo writes these into app.getPath('userData') in dev)
+recordings/
+recordings.json
+settings.json
+model-cache.json
+capture-pill-bounds.json

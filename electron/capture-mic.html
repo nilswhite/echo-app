@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Microphone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: light dark; }
+    [data-theme="light"] { color-scheme: light; }
+    [data-theme="dark"]  { color-scheme: dark; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: color-mix(in srgb, var(--bg) 97%, transparent);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 12px;
+      padding: 10px;
+      -webkit-app-region: no-drag;
+    }
+    .title {
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .level-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; margin-bottom: 8px;
+      background: var(--surface); border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .level-label { font-size: 10px; color: var(--text-faint); }
+    .level-track {
+      flex: 1; height: 6px;
+      background: color-mix(in srgb, var(--text) 8%, transparent);
+      border-radius: 3px; overflow: hidden;
+    }
+    .level-fill { height: 100%; background: var(--green); width: 0%; transition: width 60ms linear; }
+    .device-list { max-height: 220px; overflow-y: auto; }
+    .device-list::-webkit-scrollbar { width: 5px; }
+    .device-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .device-list::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+    .device {
+      display: block; width: 100%; text-align: left;
+      padding: 7px 10px; font-size: 12px;
+      background: transparent; color: var(--text);
+      border: none; border-radius: 5px; cursor: pointer;
+      font-family: inherit;
+      transition: background 0.1s;
+    }
+    .device:hover { background: var(--surface-hover); }
+    .device.selected { background: var(--accent-dim); color: var(--accent); font-weight: 500; }
+    .hint {
+      margin-top: 8px; font-size: 10px;
+      color: var(--text-faint);
+      padding: 0 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="title">Microphone</div>
+  <div class="level-row">
+    <span class="level-label">Level</span>
+    <div class="level-track"><div class="level-fill" id="levelFill"></div></div>
+  </div>
+  <div class="device-list" id="deviceList"></div>
+  <div class="hint">Speak to test. Esc to dismiss.</div>
+  <script src="theme-vars.js"></script>
+  <script>
+    EchoTheme.boot();
+
+    const PREF_KEY = 'echo.preferredMic';
+    const levelFill = document.getElementById('levelFill');
+    const deviceList = document.getElementById('deviceList');
+
+    let preferredId = localStorage.getItem(PREF_KEY + '.id') || '';
+    let preferredLabel = localStorage.getItem(PREF_KEY + '.label') || '';
+    let previewStream = null;
+    let audioCtx = null, analyser = null, meterBuffer = null, rafId = null;
+
+    function startMeter(stream) {
+      stopMeter();
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 1024;
+        src.connect(analyser);
+        meterBuffer = new Float32Array(analyser.fftSize);
+        const tick = () => {
+          if (!analyser) return;
+          analyser.getFloatTimeDomainData(meterBuffer);
+          let sum = 0;
+          for (let i = 0; i < meterBuffer.length; i++) sum += meterBuffer[i] * meterBuffer[i];
+          const rms = Math.sqrt(sum / meterBuffer.length);
+          const level = Math.min(1, rms * 4);
+          levelFill.style.width = (level * 100).toFixed(0) + '%';
+          rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+      } catch {}
+    }
+
+    function stopMeter() {
+      if (rafId != null) cancelAnimationFrame(rafId);
+      if (audioCtx) audioCtx.close().catch(() => {});
+      audioCtx = analyser = null; rafId = null;
+      levelFill.style.width = '0%';
+    }
+
+    async function openPreview() {
+      closePreview();
+      try {
+        const constraints = preferredId ? { audio: { deviceId: { exact: preferredId } } } : { audio: true };
+        previewStream = await navigator.mediaDevices.getUserMedia(constraints);
+        startMeter(previewStream);
+      } catch {}
+    }
+
+    function closePreview() {
+      if (previewStream) { previewStream.getTracks().forEach(t => t.stop()); previewStream = null; }
+      stopMeter();
+    }
+
+    async function refresh() {
+      try {
+        const all = await navigator.mediaDevices.enumerateDevices();
+        const inputs = all.filter(d => d.kind === 'audioinput');
+        deviceList.innerHTML = '';
+        const addBtn = (id, label, selected) => {
+          const b = document.createElement('button');
+          b.className = 'device' + (selected ? ' selected' : '');
+          b.textContent = label;
+          b.addEventListener('click', async () => {
+            preferredId = id;
+            preferredLabel = label;
+            localStorage.setItem(PREF_KEY + '.id', id);
+            localStorage.setItem(PREF_KEY + '.label', label);
+            // Persist to settings.json so the tray submenu stays in sync.
+            try {
+              await window.echo?.writeSettings?.({ preferredMicId: id, preferredMicLabel: label });
+            } catch {}
+            window.echo?.pickMicDevice?.(id, label);
+            await openPreview();
+            refresh();
+          });
+          deviceList.appendChild(b);
+        };
+        addBtn('', 'System default', preferredId === '');
+        for (const d of inputs) {
+          addBtn(d.deviceId, d.label || ('Input ' + d.deviceId.slice(0, 6)), preferredId === d.deviceId);
+        }
+      } catch {}
+    }
+
+    async function init() {
+      // Prefer settings.json (synced with the tray submenu); fall back to localStorage.
+      try {
+        const s = await window.echo?.readSettings?.();
+        if (s?.preferredMicId !== undefined) {
+          preferredId = s.preferredMicId || '';
+          preferredLabel = s.preferredMicLabel || '';
+        } else {
+          preferredId = localStorage.getItem(PREF_KEY + '.id') || '';
+          preferredLabel = localStorage.getItem(PREF_KEY + '.label') || '';
+        }
+      } catch {
+        preferredId = localStorage.getItem(PREF_KEY + '.id') || '';
+        preferredLabel = localStorage.getItem(PREF_KEY + '.label') || '';
+      }
+      await openPreview();
+      await refresh();
+    }
+
+    // Lazy init: only when the picker is actually shown, so we don't hold the mic
+    // open for Echo's entire lifetime.
+    if (window.echo?.onMicPickerShow) window.echo.onMicPickerShow(() => init());
+
+    navigator.mediaDevices.addEventListener?.('devicechange', () => {
+      if (previewStream) refresh();
+    });
+
+    window.addEventListener('blur', closePreview);
+    /**
+     * BrowserWindow.hide() doesn't always fire 'blur' in the renderer reliably,
+     * so listen for visibility too. This is the catch-all that prevents the mic
+     * preview stream from leaking and wedging coreaudiod.
+     */
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') closePreview();
+    });
+    window.addEventListener('beforeunload', closePreview);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') window.echo?.hideMicPicker?.();
+    });
+  </script>
+</body>
+</html>

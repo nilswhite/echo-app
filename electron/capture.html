@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Echo Capture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: light dark; }
+    [data-theme="light"] { color-scheme: light; }
+    [data-theme="dark"]  { color-scheme: dark; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: color-mix(in srgb, var(--bg) 95%, transparent);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      color: var(--text);
+      border-radius: 12px;
+      overflow: hidden;
+      -webkit-app-region: drag;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    body.pill-mode { display: block; }   /* pill mode keeps its absolute layout */
+    .capture-container {
+      padding: 14px 20px 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
+    }
+    .title-input, .footer-btn, .mic-btn, .pill-btn, .minimize-btn { -webkit-app-region: no-drag; }
+
+    /* Minimize-to-pill button — only visible during an active recording. */
+    .minimize-btn {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 22px; height: 22px;
+      display: none;
+      align-items: center; justify-content: center;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      color: var(--text-faint);
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      padding: 0;
+    }
+    .minimize-btn:hover { background: var(--surface-hover); color: var(--accent); border-color: var(--border); }
+    body.recording:not(.pill-mode) .minimize-btn { display: inline-flex; }
+    body.recording:not(.pill-mode) .title-input { padding-right: 28px; }
+
+    body.pill-mode { border-radius: 19px; }
+    body.pill-mode.with-title { border-radius: 12px; }
+    body.pill-mode .capture-container { display: none; }
+    body:not(.pill-mode) .pill-container { display: none; }
+    body:not(.pill-mode) .pill-chevron-strip { display: none; }
+    body:not(.pill-mode) .pill-title-row { display: none; }
+    body:not(.with-title) .pill-title-row { display: none; }
+    .pill-container {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 8px; font-size: 12px;
+      height: 38px;
+    }
+    /* Bottom strip with downward chevron — toggles the title input */
+    .pill-chevron-strip {
+      -webkit-app-region: no-drag;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 14px;
+      cursor: pointer;
+      color: var(--text-faint);
+      transition: color 0.12s, background 0.12s;
+      border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+    }
+    .pill-chevron-strip:hover { color: var(--text-dim); background: color-mix(in srgb, var(--text) 6%, transparent); }
+    .pill-chevron-strip svg { transition: transform 0.18s; }
+    body.with-title .pill-chevron-strip svg { transform: rotate(180deg); }
+    body.with-title .pill-chevron-strip { color: var(--accent); }
+
+    .pill-title-row {
+      -webkit-app-region: no-drag;
+      display: flex;
+      padding: 0 8px 6px;
+    }
+    .pill-title-input {
+      flex: 1;
+      padding: 5px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 11px;
+      font-family: inherit;
+      outline: none;
+    }
+    .pill-title-input:focus { border-color: var(--accent); }
+    .pill-title-input::placeholder { color: var(--text-faint); }
+    .pill-mic { color: var(--red); display: inline-flex; align-items: center; }
+    .pill-bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 11px; }
+    .pill-bar { width: 2.5px; background: var(--border-light); border-radius: 1.5px; transition: background 60ms linear; }
+    .pill-bar.p1 { height: 4px; }
+    .pill-bar.p2 { height: 7px; }
+    .pill-bar.p3 { height: 10px; }
+    .pill-bar.on { background: var(--green); }
+    .pill-time {
+      font-variant-numeric: tabular-nums; color: var(--text);
+      font-size: 12px; font-weight: 500;
+      margin-right: auto;
+    }
+    .pill-btn {
+      cursor: pointer; padding: 3px; background: transparent; border: none;
+      color: var(--text-dim); display: inline-flex; align-items: center; border-radius: 4px;
+    }
+    .pill-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+    .pill-btn-stop { color: var(--red); }
+    .pill-btn-stop:hover { color: var(--red); background: var(--red-dim); }
+    .pill-silent {
+      font-size: 10px; color: var(--yellow); padding: 1px 5px; border-radius: 4px;
+      background: var(--yellow-dim);
+    }
+
+    .title-row {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+    .title-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 15px;
+      font-family: inherit;
+      line-height: 1.45;
+      resize: none;
+      overflow-y: auto;
+      padding: 2px 0;
+      caret-color: var(--accent);
+    }
+    .title-input::placeholder { color: var(--text-faint); }
+    .title-input::-webkit-scrollbar { width: 5px; }
+    .title-input::-webkit-scrollbar-track { background: transparent; }
+    .title-input::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .title-input::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+    .footer-row {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .footer-btn {
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .footer-btn:hover { border-color: var(--border-light); color: var(--text); }
+    .footer-btn.recording {
+      border-color: var(--red);
+      color: var(--red);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .record-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+    .stop-square { width: 6px; height: 6px; border-radius: 1px; background: var(--red); }
+    .hint { margin-left: auto; font-size: 10px; color: var(--text-faint); }
+    .mic-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 8px; font-size: 11px;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: transparent; color: var(--text-dim); cursor: pointer;
+      font-family: inherit;
+    }
+    .mic-btn:hover { border-color: var(--border-light); color: var(--text); }
+    .mic-bars { display: inline-flex; gap: 1.5px; align-items: flex-end; height: 10px; }
+    .mic-bar { width: 2.5px; background: var(--border-light); border-radius: 1px; transition: background 60ms linear; }
+    .mic-bar.b1 { height: 4px; }
+    .mic-bar.b2 { height: 6px; }
+    .mic-bar.b3 { height: 8px; }
+    .mic-bar.on { background: var(--green); }
+    .mic-warning {
+      font-size: 10px; color: var(--yellow);
+      padding: 3px 8px; border-radius: 6px;
+      background: var(--yellow-dim); border: 1px solid color-mix(in srgb, var(--yellow) 30%, transparent);
+    }
+
+    .success-flash {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--green-dim);
+      border-radius: 12px;
+      opacity: 0;
+      transition: opacity 150ms;
+      pointer-events: none;
+    }
+    .success-flash.show { opacity: 1; }
+    .success-flash svg { width: 32px; height: 32px; color: var(--green); }
+  </style>
+</head>
+<body>
+  <div class="capture-container">
+    <button class="minimize-btn" id="btnMinimizeToPill" title="Minimize to pill">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="5,2 5,5 2,5"/>
+        <polyline points="10,7 7,7 7,10"/>
+      </svg>
+    </button>
+    <div class="title-row">
+      <textarea
+        class="title-input"
+        id="titleInput"
+        placeholder="Type a note, or click Record"
+        autocomplete="off"
+        spellcheck="false"
+        rows="4"
+      ></textarea>
+    </div>
+    <div class="footer-row">
+      <button class="footer-btn" id="btnRecord">
+        <span class="record-dot"></span>
+        Record
+      </button>
+      <button class="mic-btn" id="btnMic" title="Select microphone">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <rect x="4.5" y="1.5" width="3" height="6" rx="1.5"/>
+          <path d="M2.5 6.5c0 2 1.5 3.5 3.5 3.5s3.5-1.5 3.5-3.5"/>
+          <line x1="6" y1="10" x2="6" y2="11.5"/>
+        </svg>
+        <span class="mic-bars">
+          <span class="mic-bar b1" id="micBar1"></span>
+          <span class="mic-bar b2" id="micBar2"></span>
+          <span class="mic-bar b3" id="micBar3"></span>
+        </span>
+      </button>
+      <span class="mic-warning" id="micWarning" style="display:none">&#x26A0; Mic silent</span>
+      <span class="hint">↵ save &middot; ⇧↵ newline &middot; Esc dismiss</span>
+    </div>
+  </div>
+
+  <div class="pill-container" id="pillContainer">
+    <span class="pill-mic" title="Recording">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <rect x="5" y="1.5" width="4" height="7" rx="2"/>
+        <path d="M2.5 7c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5"/>
+        <line x1="7" y1="11.5" x2="7" y2="13"/>
+      </svg>
+    </span>
+    <span class="pill-bars">
+      <span class="pill-bar p1" id="pillBar1"></span>
+      <span class="pill-bar p2" id="pillBar2"></span>
+      <span class="pill-bar p3" id="pillBar3"></span>
+    </span>
+    <span class="pill-time" id="pillTime">0:00</span>
+    <span class="pill-silent" id="pillSilent" style="display:none" title="Mic silent">&#x26A0;</span>
+    <button class="pill-btn pill-btn-stop" id="btnPillStop" title="Stop recording">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="3" y="3" width="6" height="6" rx="1"/></svg>
+    </button>
+    <button class="pill-btn" id="btnPillExpand" title="Expand">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="2,5 2,2 5,2"/>
+        <polyline points="10,7 10,10 7,10"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="pill-chevron-strip" id="pillChevronStrip" title="Add a title">
+    <svg width="11" height="6" viewBox="0 0 11 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="1,1 5.5,5 10,1"></polyline>
+    </svg>
+  </div>
+  <div class="pill-title-row">
+    <input type="text" class="pill-title-input" id="pillTitleInput" placeholder="Title for this recording (optional)" autocomplete="off" spellcheck="false" />
+  </div>
+
+  <div class="success-flash" id="successFlash">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  </div>
+
+  <script src="theme-vars.js"></script>
+  <script>
+    // Apply theme as early as possible so the user never sees a flash of wrong colors.
+    EchoTheme.boot();
+
+    const SERVER_PORT = 3739;
+    const API = `http://localhost:${SERVER_PORT}`;
+
+    const input = document.getElementById('titleInput');
+    const flash = document.getElementById('successFlash');
+    const btnRecord = document.getElementById('btnRecord');
+    const btnMic = document.getElementById('btnMic');
+    const micBar1 = document.getElementById('micBar1');
+    const micBar2 = document.getElementById('micBar2');
+    const micBar3 = document.getElementById('micBar3');
+    const micWarning = document.getElementById('micWarning');
+    const pillBar1 = document.getElementById('pillBar1');
+    const pillBar2 = document.getElementById('pillBar2');
+    const pillBar3 = document.getElementById('pillBar3');
+    const pillTime = document.getElementById('pillTime');
+    const pillSilent = document.getElementById('pillSilent');
+    const btnPillStop = document.getElementById('btnPillStop');
+    const btnPillExpand = document.getElementById('btnPillExpand');
+    const pillChevronStrip = document.getElementById('pillChevronStrip');
+    const pillTitleInput = document.getElementById('pillTitleInput');
+    const btnMinimizeToPill = document.getElementById('btnMinimizeToPill');
+    let pillTitleExpanded = false;
+
+    let isRecording = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingStartTime = 0;
+    let timerInterval = null;
+
+    let preferredDeviceId = '';
+    let audioCtx = null, analyser = null, analyserSource = null, meterBuffer = null;
+    let meterRaf = null, silenceStart = null;
+
+    // Read mic preference from settings (set via tray submenu or in-window picker).
+    async function refreshPreferredMic() {
+      try {
+        const s = await window.echo.readSettings();
+        preferredDeviceId = s?.preferredMicId || '';
+      } catch {}
+    }
+    refreshPreferredMic();
+
+    // In-window picker still works and broadcasts to other surfaces — keep listener.
+    if (window.echo?.onMicDevicePicked) {
+      window.echo.onMicDevicePicked(({ deviceId }) => { preferredDeviceId = deviceId || ''; });
+    }
+
+    // Push the device list to the main process so the tray submenu can show it.
+    async function broadcastDeviceList() {
+      try {
+        const all = await navigator.mediaDevices.enumerateDevices();
+        const inputs = all
+          .filter((d) => d.kind === 'audioinput')
+          .map((d) => ({ deviceId: d.deviceId, label: d.label || '' }));
+        window.echo?.publishMicDevices?.(inputs);
+      } catch {}
+    }
+    broadcastDeviceList();
+    navigator.mediaDevices.addEventListener?.('devicechange', broadcastDeviceList);
+
+    function stopMeter() {
+      if (meterRaf != null) cancelAnimationFrame(meterRaf);
+      meterRaf = null;
+      silenceStart = null;
+      try { if (analyserSource) analyserSource.disconnect(); } catch {}
+      try { if (analyser) analyser.disconnect(); } catch {}
+      if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+      analyser = null; analyserSource = null; meterBuffer = null;
+      for (const el of [micBar1, micBar2, micBar3, pillBar1, pillBar2, pillBar3]) {
+        if (el) el.classList.remove('on');
+      }
+      micWarning.style.display = 'none';
+      if (pillSilent) pillSilent.style.display = 'none';
+    }
+
+    function startMeter(stream) {
+      stopMeter();
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyserSource = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 1024;
+        analyserSource.connect(analyser);
+        meterBuffer = new Float32Array(analyser.fftSize);
+        const tick = () => {
+          if (!analyser) return;
+          analyser.getFloatTimeDomainData(meterBuffer);
+          let sum = 0;
+          for (let i = 0; i < meterBuffer.length; i++) sum += meterBuffer[i] * meterBuffer[i];
+          const rms = Math.sqrt(sum / meterBuffer.length);
+          const level = Math.min(1, rms * 4);
+          const on1 = level > 0.08, on2 = level > 0.22, on3 = level > 0.45;
+          micBar1.classList.toggle('on', on1);
+          micBar2.classList.toggle('on', on2);
+          micBar3.classList.toggle('on', on3);
+          if (pillBar1) pillBar1.classList.toggle('on', on1);
+          if (pillBar2) pillBar2.classList.toggle('on', on2);
+          if (pillBar3) pillBar3.classList.toggle('on', on3);
+          if (isRecording) {
+            const now = Date.now();
+            if (rms < 0.005) {
+              if (silenceStart == null) silenceStart = now;
+              else if (now - silenceStart >= 3000) {
+                micWarning.style.display = 'inline-flex';
+                if (pillSilent) pillSilent.style.display = 'inline-flex';
+              }
+            } else {
+              silenceStart = null;
+              micWarning.style.display = 'none';
+              if (pillSilent) pillSilent.style.display = 'none';
+            }
+          }
+          meterRaf = requestAnimationFrame(tick);
+        };
+        meterRaf = requestAnimationFrame(tick);
+      } catch { /* silent */ }
+    }
+
+    btnMic.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = btnMic.getBoundingClientRect();
+      window.echo?.showMicPicker?.({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    });
+
+    function formatElapsed(sec) {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function enterPillMode() {
+      document.body.classList.add('pill-mode');
+      window.echo?.enterPillMode?.();
+    }
+
+    function exitPillMode() {
+      document.body.classList.remove('pill-mode');
+      window.echo?.exitPillMode?.();
+    }
+
+    async function startRecordingFlow() {
+      try {
+        window.echo?.hideMicPicker?.();
+        await refreshPreferredMic();
+        const constraints = preferredDeviceId ? { audio: { deviceId: { exact: preferredDeviceId } } } : { audio: true };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        startMeter(stream);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+        audioChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          isRecording = false;
+          document.body.classList.remove('recording');
+          stopMeter();
+          clearInterval(timerInterval);
+          btnRecord.innerHTML = '<span class="record-dot"></span> Record';
+          btnRecord.classList.remove('recording');
+
+          // Collapse the title row if it was open
+          if (pillTitleExpanded) {
+            pillTitleExpanded = false;
+            document.body.classList.remove('with-title');
+          }
+          if (document.body.classList.contains('pill-mode')) exitPillMode();
+
+          input.disabled = true;
+          input.value = 'Saving recording…';
+          try {
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            const duration = (Date.now() - recordingStartTime) / 1000;
+
+            const startRes = await fetch(`${API}/api/recordings/start`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ audioFormat: 'webm' }),
+            });
+            const rec = await startRes.json();
+
+            const form = new FormData();
+            form.append('audio', blob, `recording-${rec.id}.webm`);
+            await fetch(`${API}/api/recordings/${rec.id}/upload`, { method: 'POST', body: form });
+            await fetch(`${API}/api/recordings/${rec.id}/stop`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ durationSeconds: duration }),
+            });
+            const userTitle = (pillTitleInput.value || '').trim();
+            await fetch(`${API}/api/recordings/${rec.id}/finalize`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userTitle }),
+            });
+
+            flash.classList.add('show');
+            setTimeout(() => {
+              flash.classList.remove('show');
+              input.value = '';
+              input.disabled = false;
+              window.echo?.cancelCapture?.();
+            }, 400);
+          } catch (err) {
+            input.value = '';
+            input.disabled = false;
+            input.style.color = '#fc8181';
+            setTimeout(() => { input.style.color = ''; }, 1000);
+          }
+        };
+
+        mediaRecorder.start(1000);
+        isRecording = true;
+        document.body.classList.add('recording');
+        recordingStartTime = Date.now();
+        btnRecord.classList.add('recording');
+        enterPillMode();
+
+        timerInterval = setInterval(() => {
+          const sec = Math.floor((Date.now() - recordingStartTime) / 1000);
+          const label = formatElapsed(sec);
+          btnRecord.innerHTML = `<span class="stop-square"></span> ${label}`;
+          if (pillTime) pillTime.textContent = label;
+        }, 1000);
+      } catch {
+        // permission denied or similar
+      }
+    }
+
+    btnRecord.addEventListener('click', () => {
+      if (isRecording) { mediaRecorder.stop(); return; }
+      startRecordingFlow();
+    });
+
+    /**
+     * If the capture window gets hidden while recording (Esc, tray click, app quit,
+     * window minimize), stop the MediaRecorder and release the stream. macOS's
+     * coreaudiod holds onto stuck device references and other apps lose the mic
+     * until coreaudiod is restarted — so we ALWAYS release on hide.
+     */
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden' && isRecording && mediaRecorder) {
+        try { mediaRecorder.stop(); } catch {}
+      }
+    });
+    window.addEventListener('beforeunload', () => {
+      try { if (isRecording && mediaRecorder) mediaRecorder.stop(); } catch {}
+      stopMeter();
+    });
+
+    btnPillStop.addEventListener('click', () => {
+      if (isRecording && mediaRecorder) mediaRecorder.stop();
+    });
+    btnPillExpand.addEventListener('click', () => {
+      // Keep recording — restore the full window so the user can interact
+      exitPillMode();
+    });
+
+    // Minimize back to the pill from the full window — only enabled mid-recording.
+    btnMinimizeToPill.addEventListener('click', () => {
+      if (isRecording) enterPillMode();
+    });
+
+    // Pill title expansion: a thin chevron strip below the pill drops a title input.
+    // Click to toggle. The typed title is sent in finalize and overrides AI title generation.
+    pillChevronStrip.addEventListener('click', () => {
+      pillTitleExpanded = !pillTitleExpanded;
+      document.body.classList.toggle('with-title', pillTitleExpanded);
+      window.echo?.togglePillTitle?.(pillTitleExpanded);
+      if (pillTitleExpanded) setTimeout(() => pillTitleInput.focus(), 50);
+    });
+    pillTitleInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); pillTitleInput.blur(); }
+    });
+
+    if (window.echo?.onCaptureFocus) {
+      window.echo.onCaptureFocus(() => {
+        input.value = '';
+        input.disabled = false;
+        input.style.color = '';
+        input.focus();
+        window.echo?.hideMicPicker?.();
+        if (document.body.classList.contains('pill-mode') && !isRecording) exitPillMode();
+      });
+    }
+
+    input.addEventListener('keydown', async (e) => {
+      if (e.key === 'Escape') {
+        window.echo?.cancelCapture?.();
+        return;
+      }
+      // Enter alone saves; Shift+Enter inserts a newline (default behavior).
+      if (e.key === 'Enter' && !e.shiftKey && input.value.trim()) {
+        e.preventDefault();
+        const text = input.value.trim();
+        input.disabled = true;
+        try {
+          const res = await fetch(`${API}/api/capture`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          flash.classList.add('show');
+          setTimeout(() => {
+            flash.classList.remove('show');
+            input.value = '';
+            input.disabled = false;
+            window.echo?.cancelCapture?.();
+          }, 400);
+        } catch {
+          input.disabled = false;
+          input.style.color = '#fc8181';
+          setTimeout(() => { input.style.color = ''; }, 1000);
+        }
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => input.focus());
+  </script>
+</body>
+</html>

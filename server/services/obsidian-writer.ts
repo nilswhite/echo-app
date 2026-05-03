@@ -2,15 +2,15 @@
  * Obsidian writer — atomic Markdown drop into the user's chosen folder.
  *
  * File layout:
- *   <vaultPath>/YYYY-MM-DD-HHmm-<slug>-<hash>.md
+ *   <vaultPath>/YYYY-MM-DD-<slug>.md
  *   <vaultPath>/_attachments/<basename>.<ext>     (audio, optional)
  *
  * `vaultPath` is the destination folder the user picked in Settings — Echo writes
  * directly there with no extra subfolder.
  *
  * Writes are atomic (write to .tmp then rename) so a partial write never syncs to
- * iCloud / Dropbox / Obsidian Sync. Filename includes a 4-char hash to avoid
- * same-minute collisions.
+ * iCloud / Dropbox / Obsidian Sync. If two captures on the same day produce the
+ * same slug, the second one becomes `YYYY-MM-DD-<slug>-2`, the third `-3`, etc.
  *
  * Honors the `retainAudio` setting: when off, the audio is discarded after the
  * Markdown is written. When on, it's copied into `_attachments/` and wikilinked
@@ -19,7 +19,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { getSettings } from './settings-store.js';
 
 export type EntryType = 'meeting' | 'note';
@@ -51,15 +50,15 @@ export async function writeMarkdownToVault(options: WriteOptions): Promise<Write
   fs.mkdirSync(vaultPath, { recursive: true });
 
   const now = new Date();
-  const baseName = buildBasename(now, options.title);
+  const audioExt = options.audioPath ? (path.extname(options.audioPath) || '.webm') : '';
+  const attachmentsDir = path.join(vaultPath, '_attachments');
+  const baseName = resolveBasename(now, options.title, vaultPath, attachmentsDir, audioExt);
   const mdPath = path.join(vaultPath, `${baseName}.md`);
 
   let audioWikilink: string | undefined;
   let attachedAudioPath: string | undefined;
   if (options.audioPath && fs.existsSync(options.audioPath) && retainAudio) {
-    const attachmentsDir = path.join(vaultPath, '_attachments');
     fs.mkdirSync(attachmentsDir, { recursive: true });
-    const audioExt = path.extname(options.audioPath) || '.webm';
     attachedAudioPath = path.join(attachmentsDir, `${baseName}${audioExt}`);
     fs.copyFileSync(options.audioPath, attachedAudioPath);
     audioWikilink = `${baseName}${audioExt}`;
@@ -78,15 +77,39 @@ export async function writeMarkdownToVault(options: WriteOptions): Promise<Write
   return { markdownPath: mdPath, audioPath: attachedAudioPath };
 }
 
-function buildBasename(now: Date, title: string): string {
+/**
+ * Pick a filename of the form `YYYY-MM-DD-<slug>`. If a file (Markdown or audio)
+ * with that exact basename already exists in the vault or attachments folder,
+ * append `-2`, `-3`, … until we find a free slot. Same suffix flows through to
+ * both the .md and the audio attachment so they always agree.
+ */
+function resolveBasename(
+  now: Date,
+  title: string,
+  vaultPath: string,
+  attachmentsDir: string,
+  audioExt: string,
+): string {
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mi = String(now.getMinutes()).padStart(2, '0');
   const slug = slugify(title);
-  const hash = crypto.randomBytes(2).toString('hex');
-  return `${yyyy}-${mm}-${dd}-${hh}${mi}-${slug}-${hash}`;
+  const root = `${yyyy}-${mm}-${dd}-${slug}`;
+
+  const isFree = (candidate: string): boolean => {
+    if (fs.existsSync(path.join(vaultPath, `${candidate}.md`))) return false;
+    if (audioExt && fs.existsSync(path.join(attachmentsDir, `${candidate}${audioExt}`))) return false;
+    return true;
+  };
+
+  if (isFree(root)) return root;
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${root}-${i}`;
+    if (isFree(candidate)) return candidate;
+  }
+  // Astonishing fallback: 1000 collisions on the same day. Append a wall-clock
+  // timestamp to guarantee uniqueness without re-introducing the random hash.
+  return `${root}-${Date.now()}`;
 }
 
 function slugify(input: string): string {

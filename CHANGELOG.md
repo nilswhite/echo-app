@@ -4,6 +4,11 @@ All notable changes to Echo are tracked in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Echo adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-05-03
+
+### Changed
+- **Filename pattern simplified** — was `YYYY-MM-DD-HHmm-<slug>-<4charhash>.md`, now `YYYY-MM-DD-<slug>.md`. The time and the random 4-char collision hash are gone; on the rare same-day same-slug collision Echo just appends `-2`, `-3`, etc. Audio attachments use the same resolved basename so the `.md` and the `_attachments/<basename>.<ext>` always agree.
+
 ## [1.0.1] — 2026-05-02
 
 ### Fixed
@@ -50,5 +55,6 @@ First shippable release. Tray-resident macOS app that records meetings (or quick
 ### Provenance
 Forked architecturally from Strata (a private companion app) — the recording pipeline, capture window, pill UX, and theme variables were ported verbatim where they were already battle-tested. ID-150 in Strata's own backlog originally specified this derivative.
 
+[1.0.2]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.2
 [1.0.1]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.1
 [1.0.0]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.0

@@ -1,16 +1,17 @@
 {
   "name": "echo",
   "productName": "Echo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Tray-resident meeting recorder that pipes structured Markdown into your Obsidian vault.",
   "license": "MIT",
   "main": "electron/entry.cjs",
   "scripts": {
     "dev": "ELECTRON=1 electron .",
-    "electron:start": "ELECTRON=1 electron .",
-    "electron:package": "electron-forge package",
-    "electron:make": "electron-forge make"
+    "build:electron": "node scripts/build-electron.cjs",
+    "electron:start": "npm run build:electron && ELECTRON=1 electron .",
+    "electron:package": "npm run build:electron && electron-forge package",
+    "electron:make": "npm run build:electron && electron-forge make"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

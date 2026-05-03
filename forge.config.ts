@@ -9,6 +9,12 @@ const config: ForgeConfig = {
     name: 'Echo',
     executableName: 'Echo',
     appBundleId: 'com.christopherwhite.echo',
+    // LSUIElement: true → tray-only app, no Dock icon, no menu bar app menu.
+    // Without this, the Dock briefly bounces an Echo icon at launch before
+    // app.dock.hide() runs in main.ts.
+    extendInfo: {
+      LSUIElement: true,
+    },
     asar: {
       unpack: '{**/*.node,**/*.dylib,**/ffmpeg-static/**}',
     },

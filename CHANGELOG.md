@@ -4,6 +4,17 @@ All notable changes to Echo are tracked in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Echo adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-05-02
+
+### Fixed
+- **Packaged app crashed silently on launch** — `entry.cjs`'s dev-mode fallback ran `tsx` at runtime in the packaged build, and tsx pulls in `esbuild`, which spawns a native helper binary from `node_modules/@esbuild/...`. asar archives aren't real directories, so `child_process.spawn` failed with `ENOTDIR` and the entire app died — process alive, but no tray, no server, no whenReady. Fix: precompile `electron/main.ts` (and everything it imports) into `electron-dist/main.cjs` via a build-time esbuild bundle. `entry.cjs` already prefers the bundle when present, so the packaged app is now pure JS at runtime — no tsx, no esbuild involvement after build time.
+- **Dock icon flashed at launch** — without `LSUIElement: true` in `Info.plist`, macOS would briefly show an Echo icon in the Dock before `app.dock.hide()` ran. Set `extendInfo.LSUIElement = true` in `forge.config.ts`. Echo is now a true tray-only app from the moment it launches.
+
+### Added
+- `scripts/build-electron.cjs` — esbuild bundler for the main process bundle
+- `npm run build:electron` script; wired into `electron:make`, `electron:package`, and `electron:start` so all packaged paths use the precompiled bundle
+- `npm run dev` is unchanged and still uses tsx for fast iteration
+
 ## [1.0.0] — 2026-05-02
 
 First shippable release. Tray-resident macOS app that records meetings (or quick text notes) via global hotkey, transcribes them with OpenAI Whisper, structures the result with Claude or GPT, and drops a Markdown file directly into a folder of your choosing — designed for piping into an Obsidian vault inbox, but works with any folder.
@@ -39,4 +50,5 @@ First shippable release. Tray-resident macOS app that records meetings (or quick
 ### Provenance
 Forked architecturally from Strata (a private companion app) — the recording pipeline, capture window, pill UX, and theme variables were ported verbatim where they were already battle-tested. ID-150 in Strata's own backlog originally specified this derivative.
 
+[1.0.1]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.1
 [1.0.0]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.0

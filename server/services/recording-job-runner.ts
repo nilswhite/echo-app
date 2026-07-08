@@ -70,7 +70,13 @@ async function runJob(recordingId: string): Promise<void> {
     // gives us per-segment speaker labels (A, B, C, …) which the structurer maps
     // to attendee names by context. No attendees → fall back to flat Whisper.
     const wantDiarize = (rec.attendees?.filter((a) => a.trim().length > 0) || []).length > 0;
-    const result = await transcribeAudio(audioPath, { diarize: wantDiarize });
+    const result = await transcribeAudio(audioPath, {
+      diarize: wantDiarize,
+      // Force chunking for long-but-small recordings: low-bitrate Opus can stay under
+      // the 25 MB size gate while exceeding the models' per-request duration caps
+      // (flat request timeouts / the 1400s diarize cap).
+      durationSeconds: rec.durationSeconds,
+    });
     setStatus(recordingId, 'transcribed');
 
     if (isLikelyHallucination(result.text)) {

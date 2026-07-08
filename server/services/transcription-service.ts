@@ -1,6 +1,6 @@
 /**
  * Transcription service — OpenAI audio transcription with ffmpeg-based chunking
- * for files >25 MB.
+ * for files >25 MB or recordings longer than the per-request duration caps.
  *
  * Two models supported:
  *   - `gpt-4o-transcribe` (default) — flat text, no speaker labels. Newer GPT-4o-
@@ -31,6 +31,17 @@ const ffmpegPath: string = typeof ffmpegPathRaw === 'string'
 const CHUNK_SECONDS = 300;
 const WHISPER_FILE_LIMIT_BYTES = 25 * 1024 * 1024;
 
+// OpenAI's transcription models cap the audio duration of a single request:
+// `gpt-4o-transcribe-diarize` rejects inputs longer than ~1400s (the "1400s model
+// cap"), and long single requests to the flat `gpt-4o-transcribe` model time out at
+// the HTTP layer (an hour-plus of audio never returns). Chunking must therefore be
+// triggered by DURATION as well as file size — Echo records low-bitrate Opus (~32
+// kbps), so a 90-minute meeting is only ~22 MB and slips under WHISPER_FILE_LIMIT_BYTES.
+// A size-only gate let those long recordings through as a single request and they
+// failed. Past this limit we split into CHUNK_SECONDS pieces, each far below every
+// per-request cap. 1200s keeps a safe margin under the 1400s diarize cap.
+const SINGLE_REQUEST_DURATION_LIMIT = 1200;
+
 export interface DiarizedSegment {
   speaker: string;
   text: string;
@@ -53,6 +64,13 @@ export interface TranscriptionOptions {
    * speaker labels. Auto-engaged by the job runner when attendees are provided.
    */
   diarize?: boolean;
+  /**
+   * Recording length in seconds, from the recording record. Used to force chunking
+   * for long-but-small (low-bitrate) recordings that stay under the 25 MB size gate
+   * yet exceed the per-request duration caps. Optional: when absent, only the file-
+   * size gate applies (pre-existing behavior).
+   */
+  durationSeconds?: number;
 }
 
 const DIARIZE_MODEL = 'gpt-4o-transcribe-diarize';
@@ -67,7 +85,12 @@ export async function transcribeAudio(
   const client = new OpenAI({ apiKey });
 
   const stat = fs.statSync(audioPath);
-  if (stat.size > WHISPER_FILE_LIMIT_BYTES) return transcribeChunked(client, audioPath, options);
+  const tooLongForSingleRequest =
+    typeof options?.durationSeconds === 'number' &&
+    options.durationSeconds > SINGLE_REQUEST_DURATION_LIMIT;
+  if (stat.size > WHISPER_FILE_LIMIT_BYTES || tooLongForSingleRequest) {
+    return transcribeChunked(client, audioPath, options);
+  }
   return transcribeSingleFile(client, audioPath, options);
 }
 

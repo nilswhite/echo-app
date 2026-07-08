@@ -53,9 +53,16 @@ recordingsRouter.post('/recordings/:id/finalize', (req, res) => {
   const rec = getRecording(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Recording not found' });
   const userTitle = String(req.body?.userTitle || '').trim();
+  const attendeesRaw = Array.isArray(req.body?.attendees) ? req.body.attendees : [];
+  const attendees = attendeesRaw
+    .map((a: unknown) => (typeof a === 'string' ? a.trim() : ''))
+    .filter((a: string) => a.length > 0);
+  const userNotes = String(req.body?.userNotes || '').trim();
   const updated = updateRecording(rec.id, {
     status: 'finalizing',
     ...(userTitle ? { userTitle } : {}),
+    ...(attendees.length ? { attendees } : {}),
+    ...(userNotes ? { userNotes } : {}),
   });
   // Fire-and-forget: client gets 202 immediately, transcription runs in the background.
   runTranscriptionJob(rec.id).catch((err) => {

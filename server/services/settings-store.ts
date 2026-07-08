@@ -24,6 +24,13 @@ export interface Settings {
   preferredMicId: string;
   preferredMicLabel: string;
   themeMode: ThemeMode;
+  /**
+   * Folder where the user's "People" notes live (one note per person, filename = name).
+   * Used to resolve attendee names to `[[wikilinks]]` and to give the structurer the
+   * canonical spelling. Empty string = auto-detect (try <vaultPath>/People, then a
+   * People sibling of vaultPath); set explicitly to disable auto-detect.
+   */
+  peoplePath: string;
 }
 
 const DEFAULTS: Settings = {
@@ -38,6 +45,7 @@ const DEFAULTS: Settings = {
   preferredMicId: '',
   preferredMicLabel: '',
   themeMode: 'system',
+  peoplePath: '',
 };
 
 function settingsPath(): string {

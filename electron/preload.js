@@ -18,7 +18,6 @@ contextBridge.exposeInMainWorld("echo", {
   cancelCapture: () => ipcRenderer.send("capture:cancel"),
   enterPillMode: () => ipcRenderer.send("capture:enter-pill-mode"),
   exitPillMode: () => ipcRenderer.send("capture:exit-pill-mode"),
-  togglePillTitle: (expanded) => ipcRenderer.send("capture:pill-title-toggle", expanded),
   showMicPicker: (anchor) => ipcRenderer.send("capture:mic-show", anchor),
   hideMicPicker: () => ipcRenderer.send("capture:mic-hide"),
   pickMicDevice: (deviceId, label) => ipcRenderer.send("capture:mic-device-picked", deviceId, label),
@@ -28,6 +27,11 @@ contextBridge.exposeInMainWorld("echo", {
 
   // Mic registry — capture renderer broadcasts device list to main.
   publishMicDevices: (devices) => ipcRenderer.send("mic:devices", devices),
+
+  // Notes mode lives inline in the capture window — this just grows/shrinks the pill.
+  toggleNotes: (expanded) => ipcRenderer.send("capture:notes-toggle", expanded),
+  resolveAttendees: (names) => ipcRenderer.invoke("attendees:resolve", names),
+  pickPeoplePath: () => ipcRenderer.invoke("settings:pick-people"),
 
   // Theme — main broadcasts new mode to all renderers when settings change.
   onThemeChange: (cb) => ipcRenderer.on("theme:apply", (_e, mode) => cb(mode)),

@@ -20,6 +20,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getSettings } from './settings-store.js';
+import type { ResolvedAttendee } from './people-index.js';
 
 export type EntryType = 'meeting' | 'note';
 
@@ -33,7 +34,11 @@ export interface WriteOptions {
     actionItems: string[];
     keyPoints: string[];
     transcript: string;
+    /** Verbatim notes the user typed during the meeting. Rendered before the transcript. */
+    userNotes?: string;
   };
+  /** Attendees already resolved against the People directory (matched names get wikilinks). */
+  attendees?: ResolvedAttendee[];
   flagged?: string;
   audioPath?: string;
 }
@@ -66,6 +71,7 @@ export async function writeMarkdownToVault(options: WriteOptions): Promise<Write
 
   const body = buildMarkdown({
     ...options,
+    attendees: options.attendees,
     createdISO: now.toISOString(),
     audioWikilink,
   });
@@ -128,16 +134,23 @@ function buildMarkdown(opts: {
   createdISO: string;
   durationSeconds?: number;
   sections: WriteOptions['sections'];
+  attendees?: ResolvedAttendee[];
   flagged?: string;
   audioWikilink?: string;
   recordingId?: string;
 }): string {
+  const attendees = (opts.attendees || []).filter((a) => a.display.trim().length > 0);
+
   const fm: string[] = ['---'];
   fm.push(`created: ${opts.createdISO}`);
   fm.push(`type: ${opts.type}`);
   if (opts.durationSeconds) fm.push(`duration: ${formatDuration(opts.durationSeconds)}`);
   fm.push(`source: echo`);
   if (opts.recordingId) fm.push(`recording_id: ${opts.recordingId}`);
+  if (attendees.length) {
+    fm.push('attendees:');
+    for (const a of attendees) fm.push(`  - "${a.display.replace(/"/g, '\\"')}"`);
+  }
   if (opts.flagged) {
     fm.push(`status: error`);
     fm.push(`error: "${opts.flagged.replace(/"/g, '\\"')}"`);
@@ -148,6 +161,12 @@ function buildMarkdown(opts: {
 
   if (opts.flagged) {
     out.push(`> [!warning] ${opts.flagged}`);
+    out.push('');
+  }
+
+  if (attendees.length) {
+    out.push('## Attendees', '');
+    for (const a of attendees) out.push(`- ${a.rendered}`);
     out.push('');
   }
 
@@ -165,6 +184,12 @@ function buildMarkdown(opts: {
     out.push('## Key Points', '');
     for (const point of opts.sections.keyPoints) out.push(`- ${point}`);
     out.push('');
+  }
+
+  // User's verbatim notes — for traceability, kept distinct from the AI summary
+  // and placed right before the recording artifacts (audio + transcript).
+  if (opts.sections.userNotes?.trim()) {
+    out.push('## My Notes', '', opts.sections.userNotes.trim(), '');
   }
 
   if (opts.audioWikilink) {

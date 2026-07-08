@@ -32,6 +32,9 @@ export interface Recording {
   fileSizeBytes: number;
   errorMessage?: string;
   userTitle?: string;
+  attendees?: string[];
+  /** Free-form notes the user typed in the capture panel (verbatim). */
+  userNotes?: string;
   createdAt: string;
   updatedAt: string;
 }

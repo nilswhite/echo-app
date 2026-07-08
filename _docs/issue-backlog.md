@@ -101,5 +101,83 @@
 </details>
 
 
+<details>
+<summary><strong>ID-005</strong> | Feature | ⚡ | User notes — manual context/actions field in the expanded capture window, fed to the summary pipeline with priority</summary>
+
+- **TL;DR:** Let the user type their own context, notes, and action items — primarily **live, during the recording** (live note-taking is the headline use case), and also before it starts — and have those flow into the synthesis pipeline as high-priority signal. Repurpose the existing "+ Add attendees" popover into an "+ Add notes" affordance that expands the capture window into a portrait-sized panel: the attendee field stays at the top, and a free-text "User notes" area sits below it. The structuring pass must treat these notes as authoritative — anything the user explicitly flagged gets surfaced in the final summary. The raw notes are also written verbatim into the output `.md` (preceding the transcript) for traceability, but the synthesis/summary is the primary deliverable.
+- **Current:** The pill exposes a "+ Add attendees" button (`capture.html:343`) that opens a small dropdown popover (`capture-attendees.html`, a ~80px textarea + resolved-list). Attendees are sent to the server on stop (`body: JSON.stringify({ userTitle, attendees })`, `capture.html:601`) and threaded into the Claude prompt via `markdown-structurer.ts` (`attendeesBlock`, `buildSystemPrompt`). There is no field for free-form user notes; the summary is generated purely from the transcript + attendee list.
+- **Expected:**
+  - **(1)** Rebrand the pill button from "+ Add attendees" → "+ Add notes" (keeps attendee entry, adds notes). Clicking expands the window into a portrait notes panel rather than the current short dropdown.
+  - **(2)** Panel layout: attendee field/resolved-list at the top (existing behavior), a labeled "User notes" open text field at the bottom — multiline, generous height, for manual context / decisions / action items the user wants guaranteed in the summary.
+  - **(3)** **Live note-taking (primary use case):** the notes panel must be usable before recording starts *and* while recording is in progress. Notes are edited continuously and held as source-of-truth in the renderer (mirror the existing attendees IPC pattern: `attendees-picker:changed`), so the latest text is captured at stop regardless of when it was typed.
+  - **(4)** Persist notes alongside attendees: include `userNotes` in the stop payload (`capture.html` POST body), carry it through `recordings.ts` → `recording-store.ts` → `recording-job-runner.ts` → `markdown-structurer.ts`.
+  - **(5)** Synthesis priority: add a `User notes:` block to the structurer user message and a system-prompt instruction that these are user-authored and must be reflected in the summary, key points, and action items with priority over transcript-only inferences (without inventing beyond what's stated).
+  - **(6)** Verbatim in output: write the raw notes into the `.md` as their own section (e.g. `## My Notes`), positioned **before** `## Transcript` (after the synthesis sections). This is for traceability only — the summary remains the primary deliverable. Skip the section entirely when notes are empty.
+- **Likely files:**
+  - `electron/capture-attendees.html` — expand into the portrait notes panel; add the "User notes" textarea below the attendee field
+  - `electron/capture.ts` / `capture.html` — window-size/expansion logic, button relabel, live `userNotes` IPC + inclusion in stop payload
+  - `server/services/markdown-structurer.ts` — new `userNotes` param, `User notes:` block, system-prompt priority rule
+  - `server/services/obsidian-writer.ts` — render the verbatim `## My Notes` section before `## Transcript` (`buildMarkdown`, around line 191)
+  - (thread-through) `server/routes/recordings.ts`, `server/services/recording-store.ts`, `recording-job-runner.ts`
+- **Risk/notes:**
+  - Window resize: the capture window currently uses fixed pill heights (`PILL_HEIGHT_WITH_TITLE`, `capture.ts:22`). The portrait panel needs its own sizing path; ensure it collapses back cleanly and doesn't fight the attendees-show/hide IPC. It must also coexist with the live recording pill state (panel open *while* recording).
+  - Keep `userNotes` optional end-to-end so existing recordings without notes structure unchanged.
+  - "Priority" wording in the prompt must avoid encouraging fabrication — notes are authoritative for *what to include*, not license to invent details.
+  - Live editing during recording: ensure typing in the notes field never steals focus/clicks from the recording controls or interrupts capture.
+- **Labels:** type: feature, priority: normal, effort: medium
+- **Design chosen (2026-06-19):** Concept B — the pill **expands in place into a portrait window** (pill controls pinned as the header, attendees + notes fields inline below). Picked via the 3-option playground (`_docs/user-notes-playground.html`). The earlier popover approach (Concept A) was replaced. Backend behavior is unchanged from the first implementation.
+- **Revised (2026-06-19, after dogfooding):** first cut layered a chevron → title-row → add-notes ladder (3+ transitions, plus a broken empty "half-pill" intermediate). Replaced with the true Concept B: a single **Notes** button on the pill bar (shows an attendee-count badge) that toggles the whole portrait in one click each way. Removed the chevron strip + `with-title` mode + the `capture:pill-title-toggle` IPC entirely; the title field moved into the portrait (top). Pill widened to `252×44` to seat the Notes button alongside the **mic selector + volume bars** (kept, per feedback). Build clean, no dangling refs.
+- **Implemented (2026-06-19, Concept B — pending manual UI verification):**
+  - **UI (inline, one window):** the `+ Add notes` button (→ `Notes [n]`) now toggles `notes-mode` on the capture window itself — no second window. Main resizes the pill to a portrait `300×432` (`capture:notes-toggle` in `electron/capture.ts`, anchored top-right so it grows down/left) and `capture.html` reveals an inline `.pill-notes-panel`: pill bar on top, then the attendees field + linked-people list, then a tall "Your notes" field. Esc / Stop / collapsing the title closes it.
+  - **Retired the popover:** deleted `electron/capture-attendees.html` and removed `captureAttendeesWindow` + all its IPC (`attendees-show/hide/set`, `user-notes-set`, the cross-window mirror) and the `getCaptureAttendeesWindow` theme-broadcast hook in `settings.ts`. Attendee parsing + People-folder resolution moved inline into `capture.html` (still uses the `attendees:resolve` invoke).
+  - **Live capture:** fields write straight to the canonical `attendees`/`userNotes` in the capture renderer (no IPC round-trip), so the latest text is captured at Stop whether the panel is open or closed, before or during recording. Same window as the recorder ⇒ inherits the `backgroundThrottling:false` fix.
+  - **Persistence:** `userNotes` rides the finalize POST → `recordings.ts` → `recording-store.ts` (`Recording.userNotes`) → `recording-job-runner.ts`. (unchanged)
+  - **Synthesis priority:** `markdown-structurer.ts` adds a `User notes:` block before the transcript + a "HIGH PRIORITY" system-prompt rule. (unchanged)
+  - **Verbatim output:** `obsidian-writer.ts` renders `## My Notes` before `## Audio`/`## Transcript`, threaded into all job-runner paths. (unchanged)
+  - **Build/checks:** `node scripts/build-electron.cjs` exit 0; `capture:notes-toggle` present and all old popover refs gone from `electron-dist/main.cjs`; `capture.html` inline script parses; `tsc` adds zero new errors over baseline; no dangling references to the removed window/IPC.
+- **Verification needed (manual — requires GUI + mic + API key):** `npm run dev` → record → click the chevron, then `+ Add notes`; confirm the **pill itself grows into a portrait window** with controls on top → add an attendee + type a distinctive action item ("Chris to send the budget by Friday") mid-recording → click away and back (recording must keep running) → Stop → confirm the vault `.md` has `## My Notes` verbatim **and** the AI `## Summary`/`## Action Items` reflect the noted action. Also check the window animates back to the pill on close and doesn't drift off-screen near a display edge.
+
+</details>
+
+
+<details>
+<summary><strong>ID-007</strong> | Bug | 🔥 | Recording durability — entire capture is lost if the renderer is interrupted before a clean Stop</summary>
+
+- **TL;DR:** A recording is only persisted in `mediaRecorder.onstop`, built from an in-memory `audioChunks` array (`capture.html:557–581`). Nothing touches disk until the user clicks Stop. So any unexpected interruption of the capture renderer before that — crash, freeze, OS kill, force-quit, power loss, an unhandled error in the upload chain — loses the **entire** recording, not just a tail. For long meetings this is the worst-case failure: an hour of audio gone with no artifact. Surfaced while investigating ID-006 (Mission Control); that fix removes one trigger, but the underlying fragility remains for every other interruption.
+- **Current:**
+  - `mediaRecorder.start(1000)` emits a chunk every second into `audioChunks` (in memory only).
+  - `onstop` is the *sole* persistence path: it Blobs the chunks, then `start` → `upload` → `stop` → `finalize` against the server. If the renderer dies before `onstop`, the array is gone. If `onstop` runs but any fetch in the chain throws, the `catch` just recolors the input — the audio is not saved anywhere recoverable (`capture.html:615`).
+  - No crash recovery, no resumable/partial file, no on-disk journal of in-flight audio.
+- **Expected:**
+  - Audio survives an unclean interruption. Target: an interrupted session yields a recoverable partial recording instead of nothing.
+  - **(Approach A — incremental disk flush)** Stream chunks to a temp file on disk as they arrive (via IPC to main, or a server "append" endpoint) instead of holding them in renderer memory. On next launch, detect an orphaned in-progress file and offer to finalize/transcribe it.
+  - **(Approach B — crash-safe finalize)** At minimum, if the `onstop` upload chain fails, persist the Blob locally (download to disk / hand to main via IPC) so the user can retry rather than losing it silently.
+  - Recovery UX: on startup, if an unfinalized recording exists, surface "Recover last recording?" rather than discarding it.
+- **Likely files:**
+  - `electron/capture.html` — chunk handling (`ondataavailable`, `onstop`), failure path at `capture.html:615`
+  - `electron/capture.ts` / `electron/main.ts` — IPC to stream/flush chunks to disk; orphan detection on launch
+  - `server/routes/recordings.ts` / `server/services/recording-store.ts` — an append/resumable upload path and orphan finalize
+- **Risk/notes:**
+  - Bigger lift than ID-006 — this is the structural fix behind the same class of bug. ID-006 stopped the bleeding for the common case (Mission Control); this addresses the general case.
+  - Disk I/O during recording must not introduce audio glitches — flush off the audio thread.
+  - Keep the happy path unchanged; recovery is additive.
+- **Labels:** type: bug, priority: high, effort: large
+
+</details>
+
+
 ## Closed Issues
+
+
+<details>
+<summary><strong>ID-006</strong> | Bug | 🔥 | Mission Control (three-finger swipe up) kills the active recording — RESOLVED (fix applied; manual verification recommended)</summary>
+
+- **Status:** Closed 2026-06-17. Fix applied; one manual end-to-end check recommended (see below).
+- **Symptom:** Three-finger swipe to Mission Control during an active recording stopped capture and the recording didn't persist.
+- **Root cause (confirmed by elimination + documented platform behavior):** All application-logic causes ruled out — the renderer never stops/cancels the recorder on Mission Control (Escape mid-recording collapses to the pill, `capture.html:731`; `cancelCapture` is never called while recording; `hideCaptureSilently()` only hides the window, which does not stop a `MediaRecorder`), and the window is reused, not reloaded, on show. Real mechanism: Echo records from a **Web Audio graph** (`new MediaRecorder(destinationNode.stream)`, `capture.html:556`); Chromium suspends the `AudioContext` and throttles timers when the window is occluded (Mission Control / Space switch / another app) because the capture `BrowserWindow` was created without `backgroundThrottling: false`. Same path as Electron [#12048](https://github.com/electron/electron/issues/12048). The throttled `setInterval` timer also froze, which is why it *looked* stopped.
+- **Fix:** added `backgroundThrottling: false` to the capture window's `webPreferences` (`electron/capture.ts:82`), set at construction time to avoid the dynamic-toggle visibility desync ([#50250](https://github.com/electron/electron/issues/50250)). Build verified (`node scripts/build-electron.cjs`, exit 0; flag present in `electron-dist/main.cjs`).
+- **Manual verification (recommended before trusting in prod):** `npm run dev` → start a recording → three-finger swipe to Mission Control, switch to another window ~30s, return → Stop → confirm the `.md` + audio persist and the transcript covers the swipe interval with no silent gap.
+- **Related:** structural durability follow-up tracked as **ID-007** (in-memory-only persistence loses the whole recording on any unclean interruption).
+- **Labels:** type: bug, priority: high, effort: medium
+</details>
 

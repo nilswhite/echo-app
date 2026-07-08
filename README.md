@@ -12,7 +12,7 @@ No bots in your meetings. No board, no database, no surface to babysit. Just cap
 
 ## Status
 
-**v1.0.2.** First build worth installing — v1.0.0 silently crashed on launch in the packaged build, v1.0.1 fixed that, v1.0.2 cleans up the filename pattern so notes land in your Obsidian sidebar as `2026-05-03-<slug>.md` instead of the noisy old `2026-05-03-0844-<slug>-0ad3.md`. See [CHANGELOG.md](CHANGELOG.md) for the full release history and the [issue backlog](_docs/issue-backlog.md) for what's coming next (ScreenCaptureKit system-audio capture, dual-track recording, speaker diarization).
+**v1.2.2.** First build worth installing — and now with attendees. The chevron-expanded section under the pill has an Attendees row that opens a popover for typing names; matched against the `.md` files in your Obsidian "People" folder, names land as `[[wikilinks]]` in the note frontmatter and an `## Attendees` section, and the structurer uses them to make a "simple diarization" pass on the transcript (`**Name:**` prefixes where the speaker is clear). See [CHANGELOG.md](CHANGELOG.md) for the full release history and the [issue backlog](_docs/issue-backlog.md) for what's coming next (ScreenCaptureKit system-audio capture, dual-track recording, real diarization).
 
 ## Install
 

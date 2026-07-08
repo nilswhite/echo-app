@@ -313,6 +313,16 @@
     </div>
 
     <div class="field">
+      <label>People folder</label>
+      <div class="row">
+        <input type="text" id="peoplePath" placeholder="Auto-detect (looks for People/ near the output folder)" readonly>
+        <button id="pickPeople" class="icon">Choose…</button>
+        <button id="clearPeople" class="icon" title="Clear and auto-detect">Auto</button>
+      </div>
+      <div class="help">Attendees you list on a recording get matched against <code>.md</code> filenames in this folder and rendered as <code>[[wikilinks]]</code>. Leave blank to auto-detect <code>People/</code> next to the output folder.</div>
+    </div>
+
+    <div class="field">
       <label for="openaiKey">OpenAI API key (Whisper transcription)</label>
       <input type="password" id="openaiKey" placeholder="sk-…">
     </div>
@@ -466,6 +476,7 @@
       EchoTheme.applyTheme(mode);
       paintThemeToggle(mode);
       $('vaultPath').value = currentSettings.vaultPath || '';
+      $('peoplePath').value = currentSettings.peoplePath || '';
       $('openaiKey').value = currentSettings.openaiKey || '';
       $('anthropicKey').value = currentSettings.anthropicKey || '';
       $('hotkey').value = currentSettings.hotkey || 'CommandOrControl+Shift+A';
@@ -480,12 +491,18 @@
       const result = await window.echo.pickVault();
       if (result?.path) $('vaultPath').value = result.path;
     });
+    $('pickPeople').addEventListener('click', async () => {
+      const result = await window.echo.pickPeoplePath?.();
+      if (result?.path) $('peoplePath').value = result.path;
+    });
+    $('clearPeople').addEventListener('click', () => { $('peoplePath').value = ''; });
     $('btnClose').addEventListener('click', () => window.echo.closeSettings());
     $('cancel').addEventListener('click', () => window.echo.closeSettings());
     $('save').addEventListener('click', async () => {
       setStatus('Saving…');
       const patch = {
         vaultPath: $('vaultPath').value.trim(),
+        peoplePath: $('peoplePath').value.trim(),
         openaiKey: $('openaiKey').value.trim(),
         anthropicKey: $('anthropicKey').value.trim(),
         structuringProvider: ddProvider.getValue(),

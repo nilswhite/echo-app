@@ -57,53 +57,115 @@
     body.recording:not(.pill-mode) .title-input { padding-right: 28px; }
 
     body.pill-mode { border-radius: 19px; }
-    body.pill-mode.with-title { border-radius: 12px; }
     body.pill-mode .capture-container { display: none; }
     body:not(.pill-mode) .pill-container { display: none; }
-    body:not(.pill-mode) .pill-chevron-strip { display: none; }
-    body:not(.pill-mode) .pill-title-row { display: none; }
-    body:not(.with-title) .pill-title-row { display: none; }
     .pill-container {
       display: flex; align-items: center; gap: 6px;
       padding: 4px 8px; font-size: 12px;
       height: 38px;
     }
-    /* Bottom strip with downward chevron — toggles the title input */
-    .pill-chevron-strip {
-      -webkit-app-region: no-drag;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 14px;
-      cursor: pointer;
-      color: var(--text-faint);
-      transition: color 0.12s, background 0.12s;
-      border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
-    }
-    .pill-chevron-strip:hover { color: var(--text-dim); background: color-mix(in srgb, var(--text) 6%, transparent); }
-    .pill-chevron-strip svg { transition: transform 0.18s; }
-    body.with-title .pill-chevron-strip svg { transform: rotate(180deg); }
-    body.with-title .pill-chevron-strip { color: var(--accent); }
-
-    .pill-title-row {
-      -webkit-app-region: no-drag;
-      display: flex;
-      padding: 0 8px 6px;
-    }
+    /* Title input — lives at the top of the expanded notes portrait. */
     .pill-title-input {
-      flex: 1;
-      padding: 5px 10px;
+      width: 100%;
+      padding: 6px 9px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 6px;
       color: var(--text);
-      font-size: 11px;
+      font-size: 12px;
       font-family: inherit;
       outline: none;
     }
     .pill-title-input:focus { border-color: var(--accent); }
     .pill-title-input::placeholder { color: var(--text-faint); }
-    .pill-mic { color: var(--red); display: inline-flex; align-items: center; }
+
+    /* Notes toggle — sits on the pill bar. One click expands to the portrait,
+       one click collapses back. Shows an attendee count badge when set. */
+    .pill-notes-btn {
+      -webkit-app-region: no-drag;
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 9px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-dim);
+      font-family: inherit; font-size: 11px; font-weight: 500;
+      cursor: pointer; white-space: nowrap;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+    }
+    .pill-notes-btn:hover { color: var(--text); border-color: var(--accent); }
+    .pill-notes-btn.has-attendees { color: var(--text); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+    body.notes-mode .pill-notes-btn { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+    .pill-notes-btn .attendees-count {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 8px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: 9px; font-weight: 600;
+    }
+
+    /* Notes mode (Concept B): the pill expands in place into a portrait window.
+       The pill controls stay pinned at the top; the attendees + notes fields
+       fill the body below. Same window as the pill — one surface, not a popover. */
+    /* Notes mode: the body fills the window (100vh) with the pill on top and the
+       panel below. Main animates the window size frame-by-frame; the growing /
+       shrinking window edge reveals or hides the panel from the bottom. No
+       clip-path — the window edge is the mask, so the shadow always matches the
+       real frame (no ghost) and there's no end-snap. Radius stays the pill's
+       19px (from .pill-mode), so it doesn't change at the end of the collapse. */
+    body.notes-mode {
+      display: flex; flex-direction: column;
+      height: 100vh; overflow: hidden;
+    }
+    body:not(.notes-mode) .pill-notes-panel { display: none; }
+    .pill-notes-panel {
+      -webkit-app-region: no-drag;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 2px 8px 8px;
+      flex: 1; min-height: 0;
+    }
+    .pill-notes-section { display: flex; flex-direction: column; gap: 5px; }
+    .pill-notes-section.grow { flex: 1; min-height: 0; }
+    .pill-notes-label {
+      font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .pill-notes-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: var(--text);
+      font-family: inherit; font-size: 11px; line-height: 1.4;
+      resize: none; outline: none;
+    }
+    .pill-notes-input:focus { border-color: var(--accent); }
+    .pill-notes-input::placeholder { color: var(--text-faint); }
+    .pill-notes-input.attendees { min-height: 42px; max-height: 70px; }
+    .pill-notes-input.notes { flex: 1; min-height: 110px; border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+    .pill-notes-resolved { display: flex; flex-direction: column; gap: 3px; max-height: 64px; overflow-y: auto; }
+    .pill-notes-resolved:empty { display: none; }
+    .pill-notes-resolved::-webkit-scrollbar { width: 5px; }
+    .pill-notes-resolved::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .pill-resolved-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      padding: 3px 7px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 5px; font-size: 10px;
+    }
+    .pill-resolved-row .matched { color: var(--accent); margin-left: 4px; font-size: 9px; }
+    .pill-resolved-x { cursor: pointer; color: var(--text-faint); background: transparent; border: none; font-size: 12px; line-height: 1; padding: 0 2px; }
+    .pill-resolved-x:hover { color: var(--red); }
+    .pill-notes-hint { font-size: 9px; color: var(--text-faint); }
+
+    .pill-mic {
+      color: var(--red); display: inline-flex; align-items: center;
+      background: transparent; border: none; padding: 3px;
+      border-radius: 4px; cursor: pointer;
+      -webkit-app-region: no-drag;
+    }
+    .pill-mic:hover { background: var(--red-dim); }
     .pill-bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 11px; }
     .pill-bar { width: 2.5px; background: var(--border-light); border-radius: 1.5px; transition: background 60ms linear; }
     .pill-bar.p1 { height: 4px; }
@@ -261,13 +323,13 @@
   </div>
 
   <div class="pill-container" id="pillContainer">
-    <span class="pill-mic" title="Recording">
+    <button class="pill-mic" id="btnPillMic" title="Switch microphone">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
         <rect x="5" y="1.5" width="4" height="7" rx="2"/>
         <path d="M2.5 7c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5"/>
         <line x1="7" y1="11.5" x2="7" y2="13"/>
       </svg>
-    </span>
+    </button>
     <span class="pill-bars">
       <span class="pill-bar p1" id="pillBar1"></span>
       <span class="pill-bar p2" id="pillBar2"></span>
@@ -275,6 +337,9 @@
     </span>
     <span class="pill-time" id="pillTime">0:00</span>
     <span class="pill-silent" id="pillSilent" style="display:none" title="Mic silent">&#x26A0;</span>
+    <button class="pill-notes-btn" id="btnPillAttendees" type="button" title="Notes & attendees">
+      <span id="pillAttendeesLabel">Notes</span>
+    </button>
     <button class="pill-btn pill-btn-stop" id="btnPillStop" title="Stop recording">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="3" y="3" width="6" height="6" rx="1"/></svg>
     </button>
@@ -286,13 +351,20 @@
     </button>
   </div>
 
-  <div class="pill-chevron-strip" id="pillChevronStrip" title="Add a title">
-    <svg width="11" height="6" viewBox="0 0 11 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="1,1 5.5,5 10,1"></polyline>
-    </svg>
-  </div>
-  <div class="pill-title-row">
-    <input type="text" class="pill-title-input" id="pillTitleInput" placeholder="Title for this recording (optional)" autocomplete="off" spellcheck="false" />
+  <div class="pill-notes-panel" id="pillNotesPanel">
+    <div class="pill-notes-section">
+      <input type="text" class="pill-title-input" id="pillTitleInput" placeholder="Title for this recording (optional)" autocomplete="off" spellcheck="false" />
+    </div>
+    <div class="pill-notes-section">
+      <div class="pill-notes-label">Attendees (one per line)</div>
+      <textarea class="pill-notes-input attendees" id="pillAttendeesInput" placeholder="Alice Chen&#10;Bob Martinez" autocomplete="off" spellcheck="false"></textarea>
+      <div class="pill-notes-resolved" id="pillResolvedList"></div>
+    </div>
+    <div class="pill-notes-section grow">
+      <div class="pill-notes-label" style="color:var(--accent)">Your notes</div>
+      <textarea class="pill-notes-input notes" id="pillNotesInput" placeholder="Context, decisions, action items to highlight in the summary…" spellcheck="true"></textarea>
+    </div>
+    <div class="pill-notes-hint">Notes get priority in the summary &amp; are saved verbatim. Esc to close.</div>
   </div>
 
   <div class="success-flash" id="successFlash">
@@ -324,10 +396,15 @@
     const pillSilent = document.getElementById('pillSilent');
     const btnPillStop = document.getElementById('btnPillStop');
     const btnPillExpand = document.getElementById('btnPillExpand');
-    const pillChevronStrip = document.getElementById('pillChevronStrip');
     const pillTitleInput = document.getElementById('pillTitleInput');
     const btnMinimizeToPill = document.getElementById('btnMinimizeToPill');
-    let pillTitleExpanded = false;
+    const btnPillAttendees = document.getElementById('btnPillAttendees');
+    const pillAttendeesLabel = document.getElementById('pillAttendeesLabel');
+    /** Canonical attendee list. Edited inline in the notes panel. */
+    let attendees = [];
+    /** Canonical free-form user notes. Mirrored from the notes panel via IPC so the
+     *  latest text is captured at stop even if the panel was closed. */
+    let userNotes = '';
 
     let isRecording = false;
     let mediaRecorder = null;
@@ -337,6 +414,7 @@
 
     let preferredDeviceId = '';
     let audioCtx = null, analyser = null, analyserSource = null, meterBuffer = null;
+    let destinationNode = null, currentStream = null;
     let meterRaf = null, silenceStart = null;
 
     // Read mic preference from settings (set via tray submenu or in-window picker).
@@ -349,8 +427,13 @@
     refreshPreferredMic();
 
     // In-window picker still works and broadcasts to other surfaces — keep listener.
+    // Mid-recording: hot-swap the mic stream feeding the active MediaRecorder so
+    // the user can fix a wrong mic without losing the recording in progress.
     if (window.echo?.onMicDevicePicked) {
-      window.echo.onMicDevicePicked(({ deviceId }) => { preferredDeviceId = deviceId || ''; });
+      window.echo.onMicDevicePicked(({ deviceId }) => {
+        preferredDeviceId = deviceId || '';
+        if (isRecording) swapMicStream(preferredDeviceId);
+      });
     }
 
     // Push the device list to the main process so the tray submenu can show it.
@@ -372,8 +455,10 @@
       silenceStart = null;
       try { if (analyserSource) analyserSource.disconnect(); } catch {}
       try { if (analyser) analyser.disconnect(); } catch {}
+      try { if (destinationNode) destinationNode.disconnect(); } catch {}
       if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
       analyser = null; analyserSource = null; meterBuffer = null;
+      destinationNode = null;
       for (const el of [micBar1, micBar2, micBar3, pillBar1, pillBar2, pillBar3]) {
         if (el) el.classList.remove('on');
       }
@@ -388,7 +473,12 @@
         analyserSource = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 1024;
+        // Route through a destination node so MediaRecorder reads from a stable
+        // sink — that way we can hot-swap the input mic without restarting the
+        // recorder. analyser is a tap on the same source.
+        destinationNode = audioCtx.createMediaStreamDestination();
         analyserSource.connect(analyser);
+        analyserSource.connect(destinationNode);
         meterBuffer = new Float32Array(analyser.fftSize);
         const tick = () => {
           if (!analyser) return;
@@ -430,6 +520,36 @@
       window.echo?.showMicPicker?.({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
     });
 
+    const btnPillMic = document.getElementById('btnPillMic');
+    btnPillMic.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = btnPillMic.getBoundingClientRect();
+      window.echo?.showMicPicker?.({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    });
+
+    /**
+     * Mid-recording mic switch: get a stream from the new device, splice it into
+     * the existing audio graph, and stop the previous device. The MediaRecorder
+     * keeps reading from destinationNode.stream, so the recording is continuous.
+     */
+    async function swapMicStream(deviceId) {
+      if (!isRecording || !audioCtx || !destinationNode) return;
+      try {
+        const constraints = deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true };
+        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        try { if (analyserSource) analyserSource.disconnect(); } catch {}
+        if (currentStream) {
+          try { currentStream.getTracks().forEach(t => t.stop()); } catch {}
+        }
+        currentStream = newStream;
+        analyserSource = audioCtx.createMediaStreamSource(newStream);
+        analyserSource.connect(analyser);
+        analyserSource.connect(destinationNode);
+      } catch {
+        // Permission denied or device unavailable — keep the previous stream live.
+      }
+    }
+
     function formatElapsed(sec) {
       const m = Math.floor(sec / 60);
       const s = sec % 60;
@@ -442,6 +562,7 @@
     }
 
     function exitPillMode() {
+      closeNotes();
       document.body.classList.remove('pill-mode');
       window.echo?.exitPillMode?.();
     }
@@ -452,12 +573,18 @@
         await refreshPreferredMic();
         const constraints = preferredDeviceId ? { audio: { deviceId: { exact: preferredDeviceId } } } : { audio: true };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentStream = stream;
         startMeter(stream);
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+        // Record from destinationNode.stream (not the raw mic) so swapMicStream
+        // can replace the input mid-recording without recreating the recorder.
+        mediaRecorder = new MediaRecorder(destinationNode.stream, { mimeType: 'audio/webm;codecs=opus' });
         audioChunks = [];
         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
         mediaRecorder.onstop = async () => {
-          stream.getTracks().forEach(t => t.stop());
+          if (currentStream) {
+            try { currentStream.getTracks().forEach(t => t.stop()); } catch {}
+            currentStream = null;
+          }
           isRecording = false;
           document.body.classList.remove('recording');
           stopMeter();
@@ -465,11 +592,8 @@
           btnRecord.innerHTML = '<span class="record-dot"></span> Record';
           btnRecord.classList.remove('recording');
 
-          // Collapse the title row if it was open
-          if (pillTitleExpanded) {
-            pillTitleExpanded = false;
-            document.body.classList.remove('with-title');
-          }
+          // Collapse the notes panel if it was open
+          closeNotes();
           if (document.body.classList.contains('pill-mode')) exitPillMode();
 
           input.disabled = true;
@@ -495,8 +619,17 @@
             await fetch(`${API}/api/recordings/${rec.id}/finalize`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userTitle }),
+              body: JSON.stringify({ userTitle, attendees, userNotes }),
             });
+            // Reset for next recording
+            attendees = [];
+            userNotes = '';
+            pillAttendeesInput.value = '';
+            pillNotesInput.value = '';
+            resolveCache = new Map();
+            pillResolvedList.innerHTML = '';
+            renderAttendeesButton();
+            pillTitleInput.value = '';
 
             flash.classList.add('show');
             setTimeout(() => {
@@ -537,16 +670,13 @@
     });
 
     /**
-     * If the capture window gets hidden while recording (Esc, tray click, app quit,
-     * window minimize), stop the MediaRecorder and release the stream. macOS's
-     * coreaudiod holds onto stuck device references and other apps lose the mic
-     * until coreaudiod is restarted — so we ALWAYS release on hide.
+     * Only the Stop button or app quit ends a recording. We deliberately do NOT
+     * stop on `visibilitychange` — macOS fires that event for Mission Control,
+     * Spotlight, Cmd+Tab, Space switches, and Stage Manager, none of which should
+     * interrupt a meeting recording. `beforeunload` is the safety net for actual
+     * window destruction (app quit), where releasing the mic stream prevents
+     * coreaudiod from holding a stuck device reference.
      */
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden' && isRecording && mediaRecorder) {
-        try { mediaRecorder.stop(); } catch {}
-      }
-    });
     window.addEventListener('beforeunload', () => {
       try { if (isRecording && mediaRecorder) mediaRecorder.stop(); } catch {}
       stopMeter();
@@ -565,17 +695,120 @@
       if (isRecording) enterPillMode();
     });
 
-    // Pill title expansion: a thin chevron strip below the pill drops a title input.
-    // Click to toggle. The typed title is sent in finalize and overrides AI title generation.
-    pillChevronStrip.addEventListener('click', () => {
-      pillTitleExpanded = !pillTitleExpanded;
-      document.body.classList.toggle('with-title', pillTitleExpanded);
-      window.echo?.togglePillTitle?.(pillTitleExpanded);
-      if (pillTitleExpanded) setTimeout(() => pillTitleInput.focus(), 50);
-    });
+    // Enter in the title input just blurs (the title rides along in finalize).
     pillTitleInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); pillTitleInput.blur(); }
     });
+
+    // ── Notes mode (Concept B) ───────────────────────────────────────────
+    // A single "Notes" button on the pill bar expands the pill in place into a
+    // portrait window (title + attendees + notes inline) and collapses it again.
+    // Fields write straight to the canonical `attendees` / `userNotes` state.
+    const pillAttendeesInput = document.getElementById('pillAttendeesInput');
+    const pillResolvedList = document.getElementById('pillResolvedList');
+    const pillNotesInput = document.getElementById('pillNotesInput');
+    let notesExpanded = false;
+
+    function renderAttendeesButton() {
+      const count = attendees.length;
+      const hasNotes = userNotes.trim().length > 0;
+      if (count > 0 || hasNotes) {
+        btnPillAttendees.classList.add('has-attendees');
+        const badge = count > 0 ? ` <span class="attendees-count">${count}</span>` : '';
+        pillAttendeesLabel.innerHTML = `Notes${badge}`;
+      } else {
+        btnPillAttendees.classList.remove('has-attendees');
+        pillAttendeesLabel.textContent = 'Notes';
+      }
+    }
+
+    let notesAnimTimer = null;
+
+    function openNotes() {
+      if (notesExpanded) return;
+      notesExpanded = true;
+      if (notesAnimTimer) { clearTimeout(notesAnimTimer); notesAnimTimer = null; }
+      // Lay out the panel below the pill; main animates the window open and the
+      // growing edge reveals it. The pill stays pinned at the top throughout.
+      document.body.classList.add('notes-mode');
+      window.echo?.toggleNotes?.(true);
+      setTimeout(() => { if (notesExpanded) pillNotesInput.focus(); }, 240);
+    }
+
+    function closeNotes() {
+      if (!notesExpanded) return;
+      notesExpanded = false;
+      window.echo?.toggleNotes?.(false);            // main animates the window closed
+      if (notesAnimTimer) clearTimeout(notesAnimTimer);
+      // Keep the panel mounted while the window shrinks; restore pill styling once
+      // the window is small again (avoids any flash of full content at the end).
+      notesAnimTimer = setTimeout(() => {
+        if (!notesExpanded) document.body.classList.remove('notes-mode');
+      }, 280);
+    }
+
+    btnPillAttendees.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (notesExpanded) closeNotes(); else openNotes();
+    });
+
+    // Attendee parsing + People-folder resolution (moved inline from the old popover).
+    function parseNames(raw) {
+      return raw.split(/[\n,]/).map((s) => s.trim()).filter((s) => s.length > 0);
+    }
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    let resolveToken = 0;
+    let resolveCache = new Map();
+    function renderResolved(names) {
+      pillResolvedList.innerHTML = '';
+      for (const name of names) {
+        const row = document.createElement('div');
+        row.className = 'pill-resolved-row';
+        const cache = resolveCache.get(name);
+        const matched = cache?.matched ? '<span class="matched">linked</span>' : '';
+        row.innerHTML = `<span>${escapeHtml(cache?.display || name)}${matched}</span>` +
+          `<button class="pill-resolved-x" data-name="${escapeHtml(name)}" title="Remove">×</button>`;
+        pillResolvedList.appendChild(row);
+      }
+      pillResolvedList.querySelectorAll('.pill-resolved-x').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const kept = pillAttendeesInput.value.split(/\n/).filter((l) => l.trim() !== btn.dataset.name.trim());
+          pillAttendeesInput.value = kept.join('\n').replace(/\n+$/, '');
+          onAttendeesInput();
+        });
+      });
+    }
+    async function resolveNames(names) {
+      const token = ++resolveToken;
+      try {
+        const resolved = await window.echo?.resolveAttendees?.(names);
+        if (token !== resolveToken) return; // raced with a newer keystroke
+        resolveCache = new Map();
+        if (Array.isArray(resolved)) {
+          for (const r of resolved) resolveCache.set(r.raw, { matched: !!r.matched, display: r.display || r.raw });
+        }
+        renderResolved(names);
+      } catch { renderResolved(names); }
+    }
+    function onAttendeesInput() {
+      attendees = parseNames(pillAttendeesInput.value);
+      renderAttendeesButton();
+      renderResolved(attendees);
+      resolveNames(attendees);
+    }
+    pillAttendeesInput.addEventListener('input', onAttendeesInput);
+    pillNotesInput.addEventListener('input', () => {
+      userNotes = pillNotesInput.value;
+      renderAttendeesButton();
+    });
+    // Esc inside the notes fields just closes the panel — it never ends the recording.
+    [pillAttendeesInput, pillNotesInput].forEach((el) => {
+      el.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeNotes(); } });
+    });
+
+    renderAttendeesButton();
 
     if (window.echo?.onCaptureFocus) {
       window.echo.onCaptureFocus(() => {
@@ -584,13 +817,21 @@
         input.style.color = '';
         input.focus();
         window.echo?.hideMicPicker?.();
+        closeNotes();
         if (document.body.classList.contains('pill-mode') && !isRecording) exitPillMode();
       });
     }
 
     input.addEventListener('keydown', async (e) => {
       if (e.key === 'Escape') {
-        window.echo?.cancelCapture?.();
+        // During an active recording, Esc collapses back to the pill instead of
+        // hiding the window — we want the Stop button to be the only way to end
+        // a recording from the UI side.
+        if (isRecording) {
+          enterPillMode();
+        } else {
+          window.echo?.cancelCapture?.();
+        }
         return;
       }
       // Enter alone saves; Shift+Enter inserts a newline (default behavior).

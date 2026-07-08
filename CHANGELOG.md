@@ -4,6 +4,55 @@ All notable changes to Echo are tracked in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Echo adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] — 2026-05-11
+
+### Fixed
+- **Mission Control / Spotlight / Cmd+Tab / Space switches ended recordings** — the capture renderer had a `visibilitychange` listener that stopped the MediaRecorder whenever `document.visibilityState` flipped to `hidden`. macOS fires that event for any Space-level interaction (Mission Control swipe, Spotlight, switching desktops, Stage Manager), so a swipe-up during a meeting silently ended the recording and shipped a partial note into the inbox. Removed the visibility-stop entirely; only the Stop button or app quit will end a recording now. The `beforeunload` cleanup still releases the mic stream on actual window destruction so coreaudiod doesn't end up holding a stuck device reference.
+- **Esc on the expanded title input no longer cancels a recording in progress** — pressing Esc while the full window was visible during a recording used to hide the window (which, via the visibility-stop bug above, ended the recording). Now Esc during recording collapses back to the pill instead, preserving the recording UI.
+
+## [1.2.1] — 2026-05-09
+
+### Changed
+- **Non-diarized transcription upgraded `whisper-1` → `gpt-4o-transcribe`** — same per-minute price, materially better accuracy on accented speech, noisy audio, and overlapping voices. The legacy Whisper V2 path was getting noticeably worse on real-world meeting audio relative to the GPT-4o-based replacement. Diarized recordings (when attendees are set) continue to use `gpt-4o-transcribe-diarize`.
+
+### Fixed
+- **Diarized recordings >30s could be silently truncated** — `gpt-4o-transcribe-diarize` requires `chunking_strategy` for inputs longer than 30 seconds, and we weren't passing it. Added `chunking_strategy: 'auto'` so the API uses server-side VAD-based segmentation. Without this, anything past the first ~30 seconds of a long meeting may have been dropped from the diarized transcript.
+
+## [1.2.0] — 2026-05-09
+
+### Added
+- **Real diarized transcription** — when attendees are listed for a recording, Echo now routes transcription through OpenAI's `gpt-4o-transcribe-diarize` model instead of `whisper-1`. The model returns the transcript pre-segmented by speaker (labeled `A`, `B`, `C`, …); the structurer then maps those labels to attendee names from context and the markdown renders as `**Alice Chen:** …` / `**You:** …` paragraphs. No attendees → unchanged Whisper path. Replaces the prompt-engineered "simple diarization" attempt that ran on flat text.
+- **Schema-enforced structuring (Anthropic structured outputs)** — the structurer now uses `client.messages.parse({ output_config: { format: jsonSchemaOutputFormat(…) } })` so the model's output is API-enforced against a JSON Schema. Eliminates the "model emitted broken JSON, parse failed silently, the title and summary are gone" failure mode entirely. OpenAI structuring also moved to schema-enforced mode via the Responses API's `text.format = { type: 'json_schema', … }`.
+
+### Changed
+- **SDK bumps** — `@anthropic-ai/sdk` 0.78.0 → 0.95.1, `openai` 6.25.0 → 6.37.0. Drop-in compatible at every existing call site.
+- **Multi-chunk diarized recordings** prefix per-chunk speaker labels with the chunk index (e.g. `1A`, `2B`) so the structurer can disambiguate speakers across chunk boundaries — chunk-1 "A" and chunk-2 "A" are independent labels from the model's perspective.
+- **Structurer pipeline simplified** — the separate "attribute transcript" call introduced in 1.1.1 is gone. Diarization comes from the transcription model; speaker mapping is part of the single structuring call. One API round-trip instead of two when attendees are set.
+
+## [1.1.1] — 2026-05-06
+
+### Fixed
+- **Mic picker and attendees popover snapped to primary monitor** — when the recording pill lived on a secondary display (especially one positioned to the left of primary, where coordinates are negative), both popovers would open on the primary display. The bounds calc used `Math.max(0, …)`, which clamped to the global origin instead of the pill's display. Now both popovers clamp to the work area of the display containing the pill.
+- **Structuring silently failed on long meetings** — the structurer asked the model to emit a single JSON object that included the entire transcript as `attributedTranscript`. With `max_tokens: 4096`, transcripts longer than ~3000 tokens truncated mid-string, JSON parsing failed, and the title/summary/action items were lost as collateral damage (only the raw transcript survived in a flagged "structuring failed" stub). Split into two independent calls: a small-output structuring call for the JSON fields, and a separate large-output (32K Claude / 16K OpenAI) attribution pass that runs in parallel. If attribution fails or truncates, structuring still succeeds and the note falls back to the raw transcript. Also surfaced the underlying parse/API errors instead of swallowing them.
+
+## [1.1.0] — 2026-05-04
+
+### Added
+- **Attendees on a recording** — the chevron-expanded section under the pill now has an "Attendees" row alongside the title row. Clicking the button opens a popover (separate frameless window, mirrors the mic-picker pattern) with a multi-line textarea (one name per line) and a remove-rows convenience list. Names persist for the recording and ride along in the finalize payload.
+- **People-folder name resolution** — attendee names are matched against `.md` filenames in your Obsidian "People" folder (case-insensitive, with an unambiguous-prefix fallback so "Alice" resolves to `Alice Chen.md` when there's only one Alice). Matched names land as `[[wikilinks]]` in both the frontmatter and a new `## Attendees` section in the body. The People folder is auto-detected as `<vaultPath>/People` (or a sibling of `vaultPath`); you can override the path in Settings.
+- **Simple diarization attempt** — when attendees are provided, the structurer is asked to emit an `attributedTranscript` field with `**Name:**` / `**You:**` prefixes inserted where the speaker is reasonably clear from context. Falls back to the raw transcript when the model leaves a line ambiguous or no attendees were given. Naturally limited by Echo's mic-only capture (ID-001 will fix that); useful right now for in-person meetings where the laptop mic catches the whole room.
+
+### Changed
+- `PILL_HEIGHT_WITH_TITLE` grew from 90 → 128 to accommodate the new attendees row.
+
+## [1.0.3] — 2026-05-04
+
+### Fixed
+- **Mic picker stuck in light mode** — `settings.ts` only broadcast `theme:apply` to the capture window and Settings window, never to the mic picker. The picker now receives the broadcast and re-themes alongside the rest of the UI.
+
+### Added
+- **Mic switching mid-recording** — the pill's mic icon is now a clickable picker (not just a status indicator), and selecting a different device while a recording is in progress hot-swaps the input without restarting the recorder. Internally the recording graph is now `MediaStreamSource → analyser + MediaStreamAudioDestinationNode`, with the `MediaRecorder` reading from the destination node so the input source can be swapped on the fly.
+
 ## [1.0.2] — 2026-05-03
 
 ### Changed
@@ -55,6 +104,12 @@ First shippable release. Tray-resident macOS app that records meetings (or quick
 ### Provenance
 Forked architecturally from Strata (a private companion app) — the recording pipeline, capture window, pill UX, and theme variables were ported verbatim where they were already battle-tested. ID-150 in Strata's own backlog originally specified this derivative.
 
+[1.2.2]: https://github.com/nilswhite/echo-app/releases/tag/v1.2.2
+[1.2.1]: https://github.com/nilswhite/echo-app/releases/tag/v1.2.1
+[1.2.0]: https://github.com/nilswhite/echo-app/releases/tag/v1.2.0
+[1.1.1]: https://github.com/nilswhite/echo-app/releases/tag/v1.1.1
+[1.1.0]: https://github.com/nilswhite/echo-app/releases/tag/v1.1.0
+[1.0.3]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.3
 [1.0.2]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.2
 [1.0.1]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.1
 [1.0.0]: https://github.com/nilswhite/echo-app/releases/tag/v1.0.0

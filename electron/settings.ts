@@ -10,7 +10,8 @@ import { BrowserWindow, ipcMain, dialog, app } from 'electron';
 import path from 'path';
 import { getSettings, updateSettings, type Settings, type StructuringProvider } from '../server/services/settings-store.js';
 import { listModels, refreshModels } from '../server/services/model-catalog.js';
-import { hideCaptureForSettings, getCaptureWindow } from './capture.js';
+import { resolveAttendees, resolvePeopleDirectory } from '../server/services/people-index.js';
+import { hideCaptureForSettings, getCaptureWindow, getCaptureMicWindow } from './capture.js';
 
 const ELECTRON_DIR = path.join(app.getAppPath(), 'electron');
 
@@ -92,10 +93,12 @@ function registerHandlers(): void {
       }
       const settings = updateSettings(patch);
       notifyListeners(settings);
-      // Broadcast theme to all open renderers (capture window).
+      // Broadcast theme to all open renderers (capture, mic picker, settings).
       if (patch.themeMode !== undefined) {
         const cap = getCaptureWindow();
         cap?.webContents.send('theme:apply', settings.themeMode);
+        const mic = getCaptureMicWindow();
+        mic?.webContents.send('theme:apply', settings.themeMode);
         if (settingsWindow && !settingsWindow.isDestroyed()) {
           settingsWindow.webContents.send('theme:apply', settings.themeMode);
         }
@@ -121,5 +124,21 @@ function registerHandlers(): void {
 
   ipcMain.on('settings:close', () => {
     if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
+  });
+
+  ipcMain.handle('attendees:resolve', (_event, names: unknown) => {
+    const list = Array.isArray(names) ? names.filter((n): n is string => typeof n === 'string') : [];
+    return resolveAttendees(list);
+  });
+
+  ipcMain.handle('attendees:people-dir', () => resolvePeopleDirectory());
+
+  ipcMain.handle('settings:pick-people', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Choose your Obsidian "People" folder',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return { path: null };
+    return { path: result.filePaths[0] };
   });
 }

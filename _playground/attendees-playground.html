@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Echo — Attendees Input Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page-bg: #0e1218;
+    --page-surface: #161b25;
+    --page-border: #232b3a;
+    --page-text: #d6deec;
+    --page-dim: #8896ad;
+    --page-faint: #5b6680;
+    --page-accent: #37c886;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--page-bg);
+    color: var(--page-text);
+    min-height: 100vh;
+    padding: 28px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 28px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .sidebar {
+    background: var(--page-surface);
+    border: 1px solid var(--page-border);
+    border-radius: 10px;
+    padding: 20px;
+    height: fit-content;
+    position: sticky; top: 28px;
+  }
+  h1 {
+    font-size: 16px; font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .lede {
+    font-size: 12px; color: var(--page-dim);
+    line-height: 1.5;
+    margin-bottom: 18px;
+  }
+  .control-group { margin-bottom: 18px; }
+  .control-label {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--page-faint);
+    margin-bottom: 8px;
+  }
+  .seg {
+    display: flex;
+    background: var(--page-bg);
+    border: 1px solid var(--page-border);
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg button {
+    flex: 1;
+    padding: 5px 8px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--page-dim);
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .seg button:hover { color: var(--page-text); }
+  .seg button.active {
+    background: var(--page-surface);
+    color: var(--page-accent);
+    box-shadow: 0 0 0 1px var(--page-border);
+  }
+  .checklist {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .checklist label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px;
+    color: var(--page-text);
+    cursor: pointer;
+  }
+  .checklist input[type=checkbox] {
+    appearance: none;
+    width: 14px; height: 14px;
+    border: 1px solid var(--page-border);
+    border-radius: 3px;
+    background: var(--page-bg);
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .checklist input[type=checkbox]:checked {
+    background: var(--page-accent);
+    border-color: var(--page-accent);
+  }
+  .checklist input[type=checkbox]:checked::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    color: #0e1218;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .helper {
+    font-size: 11px; color: var(--page-faint);
+    line-height: 1.5;
+    margin-top: 6px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  .variant-card {
+    background: var(--page-surface);
+    border: 1px solid var(--page-border);
+    border-radius: 10px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    position: relative;
+  }
+  .variant-card.picked {
+    border-color: var(--page-accent);
+    box-shadow: 0 0 0 1px var(--page-accent);
+  }
+  .variant-header {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .variant-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--page-bg);
+    border: 1px solid var(--page-border);
+    color: var(--page-dim);
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .variant-card.picked .variant-num {
+    background: var(--page-accent);
+    border-color: var(--page-accent);
+    color: #0e1218;
+  }
+  .variant-meta { flex: 1; }
+  .variant-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--page-text);
+    margin-bottom: 2px;
+  }
+  .variant-desc {
+    font-size: 11px;
+    color: var(--page-dim);
+    line-height: 1.5;
+  }
+  .pick-btn {
+    background: transparent;
+    border: 1px solid var(--page-border);
+    color: var(--page-dim);
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.12s;
+    flex-shrink: 0;
+  }
+  .pick-btn:hover { color: var(--page-text); border-color: var(--page-faint); }
+  .variant-card.picked .pick-btn {
+    background: var(--page-accent);
+    border-color: var(--page-accent);
+    color: #0e1218;
+  }
+
+  /* ===== PILL MOCK ===== */
+  .pill-stage {
+    padding: 16px 0 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .pill-mock {
+    width: 192px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    overflow: visible;
+    position: relative;
+  }
+  /* Per-mock theme vars (set via data-theme attribute) */
+  .pill-mock[data-theme="dark"] {
+    --bg: #1b212c;
+    --surface: #283040;
+    --surface-hover: #2e3a4d;
+    --border: #2c3548;
+    --border-light: #3d4a60;
+    --text: #bac7e4;
+    --text-dim: #99a3b8;
+    --text-faint: #677696;
+    --accent: #37c886;
+    --accent-dim: rgba(55, 200, 134, 0.18);
+    --red: #ff4579;
+    --green: #6af699;
+  }
+  .pill-mock[data-theme="light"] {
+    --bg: #faf9f5;
+    --surface: #f0eee6;
+    --surface-hover: #e8e6dc;
+    --border: #e8e6dc;
+    --border-light: #d1cfc5;
+    --text: #141413;
+    --text-dim: #5e5d59;
+    --text-faint: #87867f;
+    --accent: #c96442;
+    --accent-dim: rgba(201, 100, 66, 0.10);
+    --red: #d93a42;
+    --green: #2e7d32;
+  }
+  .pill-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px; font-size: 12px;
+    height: 38px;
+  }
+  .pill-mic { color: var(--red); display: inline-flex; }
+  .pill-bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 11px; }
+  .pill-bar { width: 2.5px; background: var(--border-light); border-radius: 1.5px; }
+  .pill-bar.p1 { height: 4px; }
+  .pill-bar.p2 { height: 7px; }
+  .pill-bar.p3 { height: 10px; }
+  .pill-bar.on { background: var(--green); }
+  .pill-time {
+    font-variant-numeric: tabular-nums; color: var(--text);
+    font-size: 12px; font-weight: 500;
+    margin-right: auto;
+    font-family: inherit;
+  }
+  .pill-btn {
+    cursor: pointer; padding: 3px;
+    background: transparent; border: none;
+    color: var(--text-dim);
+    display: inline-flex; align-items: center;
+    border-radius: 4px;
+  }
+  .pill-btn-stop { color: var(--red); }
+  .pill-chevron-strip {
+    display: flex; align-items: center; justify-content: center;
+    height: 14px;
+    color: var(--accent);
+    border-top: 1px solid var(--border);
+  }
+  .pill-chevron-strip svg { transform: rotate(180deg); }
+  .pill-title-row, .pill-attendees-row {
+    padding: 0 8px 6px;
+  }
+  .pill-attendees-row { padding-bottom: 8px; }
+  .pill-title-row {
+    border-bottom: 1px dashed color-mix(in srgb, var(--border) 60%, transparent);
+    padding-top: 6px;
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+  }
+  .pill-input {
+    width: 100%;
+    padding: 5px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 11px;
+    font-family: inherit;
+    outline: none;
+  }
+  .pill-input::placeholder { color: var(--text-faint); }
+  .pill-input:focus { border-color: var(--accent); }
+
+  /* Variant 2: chips */
+  .chip-shell {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+    padding: 4px 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    min-height: 24px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 10px;
+    padding: 2px 6px 2px 8px;
+    font-size: 10px; font-weight: 500;
+    line-height: 1.2;
+  }
+  .chip-x {
+    cursor: pointer;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    font-size: 9px;
+    margin-left: 1px;
+  }
+  .chip-x:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+  .chip-input {
+    flex: 1;
+    min-width: 60px;
+    border: none;
+    background: transparent;
+    outline: none;
+    color: var(--text);
+    font-size: 11px;
+    font-family: inherit;
+    padding: 2px 2px;
+  }
+  .chip-input::placeholder { color: var(--text-faint); }
+
+  /* Variant 3: recents strip */
+  .recents-shell {
+    display: flex; align-items: center; gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 4px;
+  }
+  .recents-strip {
+    display: flex; gap: 3px;
+    overflow-x: auto;
+    flex: 1;
+    scrollbar-width: none;
+    padding-right: 2px;
+  }
+  .recents-strip::-webkit-scrollbar { display: none; }
+  .recents-chip {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border-radius: 9px;
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 10px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.1s;
+    white-space: nowrap;
+  }
+  .recents-chip:hover { color: var(--text); }
+  .recents-chip.on {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .recents-add-btn {
+    flex-shrink: 0;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--surface-hover);
+    border: 1px solid var(--border-light);
+    color: var(--text-dim);
+    font-size: 12px; line-height: 1;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .recents-add-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Variant 4: + Add button */
+  .add-btn {
+    width: 100%;
+    padding: 5px 10px;
+    background: transparent;
+    border: 1px dashed var(--border-light);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: all 0.1s;
+  }
+  .add-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .add-btn .count {
+    font-size: 9px;
+    padding: 1px 5px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 8px;
+    font-weight: 500;
+  }
+  .add-btn.has-attendees {
+    color: var(--text);
+    border-style: solid;
+    border-color: var(--border);
+    background: var(--surface);
+  }
+  .popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 220px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    z-index: 5;
+  }
+  .popover-label {
+    font-size: 9px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+  }
+  .popover-textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 8px;
+    color: var(--text);
+    font-size: 11px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 64px;
+  }
+  .popover-textarea:focus { border-color: var(--accent); }
+  .popover-list {
+    margin-top: 8px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .popover-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 3px 6px;
+    background: var(--surface);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text);
+  }
+  .popover-x {
+    cursor: pointer;
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+  .popover-x:hover { color: var(--red); }
+
+  .stage-caption {
+    margin-top: 14px;
+    font-size: 10px;
+    color: var(--page-faint);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Prompt section */
+  .prompt-block {
+    grid-column: 1 / -1;
+    margin-top: 28px;
+    background: var(--page-surface);
+    border: 1px solid var(--page-border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .prompt-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .prompt-title {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--page-faint);
+  }
+  .copy-btn {
+    background: var(--page-accent);
+    color: #0e1218;
+    border: none;
+    border-radius: 5px;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 11px; font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .copy-btn:hover { opacity: 0.85; }
+  .copy-btn.copied { background: var(--page-text); }
+  .prompt-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--page-text);
+    background: var(--page-bg);
+    border: 1px solid var(--page-border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>Attendees Input</h1>
+    <p class="lede">
+      Compare 4 designs for the new attendees row in the recording pill. Pick one — the prompt at the bottom updates with implementation guidance.
+    </p>
+
+    <div class="control-group">
+      <div class="control-label">State</div>
+      <div class="seg" id="seg-state">
+        <button data-val="empty">Empty</button>
+        <button data-val="filled" class="active">Filled</button>
+      </div>
+      <p class="helper">Filled state shows Alice / Bob / Carol added.</p>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">Pill theme</div>
+      <div class="seg" id="seg-theme">
+        <button data-val="dark" class="active">Dark</button>
+        <button data-val="light">Light</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">Variant 4 popover</div>
+      <div class="seg" id="seg-popover">
+        <button data-val="closed" class="active">Closed</button>
+        <button data-val="open">Open</button>
+      </div>
+      <p class="helper">Variant 4 hides complexity behind a click — toggle to peek inside.</p>
+    </div>
+  </aside>
+
+  <main>
+    <div class="grid">
+      <!-- VARIANT 1: comma-separated single line -->
+      <div class="variant-card" data-variant="1">
+        <div class="variant-header">
+          <div class="variant-num">1</div>
+          <div class="variant-meta">
+            <div class="variant-title">Comma-separated line</div>
+            <div class="variant-desc">Plain text input. Simplest possible. No parse feedback.</div>
+          </div>
+          <button class="pick-btn">Pick</button>
+        </div>
+        <div class="pill-stage">
+          <div class="pill-mock" data-theme="dark" id="mock-1"></div>
+          <div class="stage-caption">192 × ~90 px</div>
+        </div>
+      </div>
+
+      <!-- VARIANT 2: chip input -->
+      <div class="variant-card" data-variant="2">
+        <div class="variant-header">
+          <div class="variant-num">2</div>
+          <div class="variant-meta">
+            <div class="variant-title">Chip input</div>
+            <div class="variant-desc">Comma or Enter chip-ifies. Visible parsing, removable. Wraps if needed.</div>
+          </div>
+          <button class="pick-btn">Pick</button>
+        </div>
+        <div class="pill-stage">
+          <div class="pill-mock" data-theme="dark" id="mock-2"></div>
+          <div class="stage-caption">192 × ~96 px (grows with chips)</div>
+        </div>
+      </div>
+
+      <!-- VARIANT 3: recents + free text -->
+      <div class="variant-card" data-variant="3">
+        <div class="variant-header">
+          <div class="variant-num">3</div>
+          <div class="variant-meta">
+            <div class="variant-title">Quick-pick recents</div>
+            <div class="variant-desc">Toggleable strip of recent attendees + "+" to add new. Fastest for repeat meetings.</div>
+          </div>
+          <button class="pick-btn">Pick</button>
+        </div>
+        <div class="pill-stage">
+          <div class="pill-mock" data-theme="dark" id="mock-3"></div>
+          <div class="stage-caption">192 × ~90 px (horizontal scroll)</div>
+        </div>
+      </div>
+
+      <!-- VARIANT 4: + Add button popover -->
+      <div class="variant-card" data-variant="4">
+        <div class="variant-header">
+          <div class="variant-num">4</div>
+          <div class="variant-meta">
+            <div class="variant-title">+ Add button + popover</div>
+            <div class="variant-desc">Single button, hides complexity in a popover (multi-line + remove rows).</div>
+          </div>
+          <button class="pick-btn">Pick</button>
+        </div>
+        <div class="pill-stage">
+          <div class="pill-mock" data-theme="dark" id="mock-4"></div>
+          <div class="stage-caption">192 × ~90 px (popover floats above)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-header">
+        <span class="prompt-title">Implementation prompt</span>
+        <button class="copy-btn" id="copyBtn">Copy</button>
+      </div>
+      <div class="prompt-text" id="promptText">Pick a variant above to see the implementation prompt.</div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const state = {
+    variant: null,
+    fillState: 'filled',
+    theme: 'dark',
+    popover: 'closed',
+  };
+
+  const FILLED_NAMES = ['Alice Chen', 'Bob Martinez', 'Carol Park'];
+  const RECENT_POOL = ['Alice Chen', 'Bob Martinez', 'Carol Park', 'Dan Lee', 'Erin Walsh', 'Frank Ojo'];
+
+  function svgIcon(kind) {
+    if (kind === 'mic') return '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="1.5" width="4" height="7" rx="2"/><path d="M2.5 7c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5"/><line x1="7" y1="11.5" x2="7" y2="13"/></svg>';
+    if (kind === 'stop') return '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="3" y="3" width="6" height="6" rx="1"/></svg>';
+    if (kind === 'expand') return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,5 2,2 5,2"/><polyline points="10,7 10,10 7,10"/></svg>';
+    if (kind === 'chevron') return '<svg width="11" height="6" viewBox="0 0 11 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,1 5.5,5 10,1"/></svg>';
+    return '';
+  }
+
+  function pillTopHTML() {
+    return `
+      <div class="pill-row">
+        <span class="pill-mic">${svgIcon('mic')}</span>
+        <span class="pill-bars">
+          <span class="pill-bar p1 on"></span>
+          <span class="pill-bar p2 on"></span>
+          <span class="pill-bar p3"></span>
+        </span>
+        <span class="pill-time">2:14</span>
+        <button class="pill-btn pill-btn-stop">${svgIcon('stop')}</button>
+        <button class="pill-btn">${svgIcon('expand')}</button>
+      </div>
+      <div class="pill-chevron-strip">${svgIcon('chevron')}</div>
+      <div class="pill-title-row">
+        <input class="pill-input" type="text" placeholder="Title for this recording (optional)" value="Q3 Planning Sync">
+      </div>
+    `;
+  }
+
+  function variant1HTML() {
+    const filled = state.fillState === 'filled';
+    const value = filled ? FILLED_NAMES.join(', ') : '';
+    return `
+      <div class="pill-attendees-row">
+        <input class="pill-input" type="text" placeholder="Attendees (comma separated)" value="${value}">
+      </div>
+    `;
+  }
+
+  function variant2HTML() {
+    const filled = state.fillState === 'filled';
+    const chips = filled
+      ? FILLED_NAMES.map(n => `<span class="chip">${n}<span class="chip-x">×</span></span>`).join('')
+      : '';
+    const placeholder = filled ? '' : 'Add attendee, comma to confirm';
+    return `
+      <div class="pill-attendees-row">
+        <div class="chip-shell">
+          ${chips}
+          <input class="chip-input" type="text" placeholder="${placeholder}">
+        </div>
+      </div>
+    `;
+  }
+
+  function variant3HTML() {
+    const filled = state.fillState === 'filled';
+    const selected = filled ? new Set(FILLED_NAMES) : new Set();
+    const chips = RECENT_POOL.map(n => {
+      const on = selected.has(n);
+      const first = n.split(' ')[0];
+      return `<button class="recents-chip${on ? ' on' : ''}">${first}</button>`;
+    }).join('');
+    return `
+      <div class="pill-attendees-row">
+        <div class="recents-shell">
+          <div class="recents-strip">${chips}</div>
+          <button class="recents-add-btn" title="Add new">+</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function variant4HTML() {
+    const filled = state.fillState === 'filled';
+    const count = filled ? FILLED_NAMES.length : 0;
+    const popoverOpen = state.popover === 'open';
+    const buttonClass = count > 0 ? 'add-btn has-attendees' : 'add-btn';
+    const buttonText = count > 0
+      ? `Attendees <span class="count">${count}</span>`
+      : `+ Add attendees`;
+    const popover = popoverOpen ? `
+      <div class="popover">
+        <div class="popover-label">Attendees (one per line)</div>
+        <textarea class="popover-textarea" placeholder="Alice Chen
+Bob Martinez
+Carol Park">${filled ? FILLED_NAMES.join('\n') : ''}</textarea>
+        ${filled ? `
+          <div class="popover-list">
+            ${FILLED_NAMES.map(n => `<div class="popover-row"><span>${n}</span><span class="popover-x">×</span></div>`).join('')}
+          </div>
+        ` : ''}
+      </div>
+    ` : '';
+    return `
+      <div class="pill-attendees-row">
+        <button class="${buttonClass}">${buttonText}</button>
+      </div>
+      ${popover}
+    `;
+  }
+
+  function renderMocks() {
+    const renderers = [variant1HTML, variant2HTML, variant3HTML, variant4HTML];
+    for (let i = 0; i < 4; i++) {
+      const el = document.getElementById('mock-' + (i + 1));
+      el.setAttribute('data-theme', state.theme);
+      el.innerHTML = pillTopHTML() + renderers[i]();
+    }
+  }
+
+  // Picked-card highlight
+  function renderPicks() {
+    document.querySelectorAll('.variant-card').forEach(card => {
+      const v = parseInt(card.dataset.variant, 10);
+      card.classList.toggle('picked', state.variant === v);
+      const btn = card.querySelector('.pick-btn');
+      btn.textContent = state.variant === v ? 'Selected' : 'Pick';
+    });
+  }
+
+  const PROMPTS = {
+    1: `Implement the attendees row as a **comma-separated single-line input** (Variant 1) in \`electron/capture.html\`.
+
+UI:
+- Add a \`.pill-attendees-row\` directly below the existing \`.pill-title-row\`, inside the same \`body.with-title\` container.
+- Use a single \`<input class="pill-input" type="text" id="pillAttendeesInput">\` styled identically to \`.pill-title-input\` (same surface bg, border, radius, font size).
+- Placeholder: \`"Attendees (comma separated)"\`.
+
+Layout:
+- The expanded pill height (\`PILL_HEIGHT_WITH_TITLE\` in \`electron/capture.ts\`) needs to grow by ~38px to accommodate the second row. Bump it from 90 → 128.
+- Both rows share the chevron-strip toggle: when the user expands, BOTH rows appear; when collapsed, both hide.
+
+Wiring:
+- On finalize, \`split(',')\`, trim each, drop empties → array of names.
+- POST to \`/api/recordings/{id}/finalize\` as \`{ userTitle, attendees: string[] }\`. The structurer can use this list to attempt simple diarization (mic-track = "you"; system-track speakers should be matched against this list).
+
+Tradeoffs to know:
+- Zero parse feedback — user can't tell if "Bob Smith Jr" was understood as one person or three. If that becomes a real problem, escalate to Variant 2 (chips).`,
+
+    2: `Implement the attendees row as a **chip input** (Variant 2) in \`electron/capture.html\`.
+
+UI:
+- Add a \`.pill-attendees-row\` below \`.pill-title-row\`. Inside it, a \`.chip-shell\` flex container that holds zero or more \`.chip\` elements followed by a borderless \`.chip-input\` text field.
+- Each \`.chip\` is a small rounded pill: \`var(--accent-dim)\` background, \`var(--accent)\` text, an inline \`×\` button on the right that removes the chip on click.
+- The shell uses \`flex-wrap: wrap\` and \`gap: 4px\` so chips reflow when they exceed one line.
+
+Behavior:
+- Typing in the input is plain text.
+- On comma keypress OR Enter: trim the current input value; if non-empty, push it to the chips array and clear the input. Comma should be \`preventDefault\`-ed (don't let the comma char into the input).
+- On Backspace when input is empty: remove the last chip (standard "did I mean to delete?" UX).
+- Click on a chip's \`×\` removes it.
+- Maintain a JS array \`attendees: string[]\` as the source of truth; re-render chips from the array on every change.
+
+Layout:
+- The pill height becomes dynamic. Default expanded height grows ~38px for one row of chips; on wrap, you'll need to either let the BrowserWindow grow (\`captureWindow.setBounds\` with a measured height after each chip-add) or cap chip wrapping at 2 rows and ellipsize beyond.
+- Simplest first cut: measure \`document.body.scrollHeight\` after each render and \`window.echo.resizePill(height)\` to a new IPC method. Add the IPC and resize handler in \`electron/capture.ts\`.
+
+Wiring:
+- Same as Variant 1: \`{ userTitle, attendees }\` to \`/api/recordings/{id}/finalize\`. The chip array IS the attendees array — no parsing on submit.
+
+Tradeoffs to know:
+- Best UX, most polish, most code (chip render/remove/keyboard logic, dynamic resize).`,
+
+    3: `Implement the attendees row as a **quick-pick recents strip + add button** (Variant 3) in \`electron/capture.html\`.
+
+UI:
+- Add a \`.pill-attendees-row\` below \`.pill-title-row\`. Inside: a \`.recents-shell\` flex container with a horizontally-scrollable \`.recents-strip\` on the left and a small \`+\` add-button on the right.
+- The strip contains \`.recents-chip\` buttons — one per recent attendee. Use first names only to keep them compact (full name shown on hover via \`title\` attribute).
+- Selected chips: filled with \`var(--accent-dim)\` bg, \`var(--accent)\` text, \`var(--accent)\` border. Unselected: transparent bg, \`var(--text-dim)\` text, \`var(--border-light)\` border.
+- The \`+\` button (18×18, circular) opens a tiny inline input or a small popover for entering a new name.
+
+Persistence:
+- Maintain a "recent attendees" list in \`settings.json\` — last ~12 unique names entered, MRU-ordered. Show the top 6–8 in the strip; the rest live behind the \`+\` button (or a "more" overflow).
+- After a recording finalizes, merge the picked names into the recents list.
+
+Behavior:
+- Click a recents chip → toggles selection (adds/removes from \`attendees\` array).
+- Click \`+\` → small inline input appears (or popover), Enter adds the name and selects it.
+- Strip scrolls horizontally with mouse wheel / trackpad swipe; hide native scrollbar.
+
+Wiring:
+- Read recents from \`settings.json\` on capture-window load (\`window.echo.readSettings\`).
+- On finalize: send \`{ userTitle, attendees }\` to \`/api/recordings/{id}/finalize\`; also send \`writeSettings({ recentAttendees: updatedList })\` so future sessions see the new MRU.
+- Server-side: add \`recentAttendees: string[]\` to \`server/services/settings-store.ts\`'s \`Settings\` shape.
+
+Tradeoffs to know:
+- Optimizes for the common case (recurring meetings, same handful of people). On first run the strip is empty — fall back to the \`+\` flow until recents accumulate.
+- No graceful path for ad-hoc meetings with strangers; the \`+\` button is the only way to add a new name and feels like a second-class citizen. Consider pairing with Variant 1's plain comma input as a fallback if needed.`,
+
+    4: `Implement the attendees row as a **+ Add button with popover** (Variant 4) in \`electron/capture.html\`.
+
+UI:
+- Add a \`.pill-attendees-row\` below \`.pill-title-row\`. Inside: a single full-width button styled like a dashed-border ghost button when empty (\`+ Add attendees\`), and a solid filled button showing the count when there are attendees (\`Attendees [3]\` with the count in a small accent badge).
+- Clicking the button opens a popover positioned absolutely below the pill (\`top: calc(100% + 8px); right: 0; width: 220px;\`).
+- Popover contains:
+  - A label "Attendees (one per line)"
+  - A multi-line \`<textarea>\` (~64px tall) where each newline = one attendee
+  - Optionally, a list of current attendees as removable rows below the textarea
+- Click outside or press Esc to close.
+
+Behavior:
+- The pill row stays a clean 38px regardless of how many attendees there are — the button just shows a count.
+- The popover's textarea is the editable source of truth: split on newlines, trim, drop empties → \`attendees: string[]\`.
+- The remove-rows below the textarea are convenience: clicking \`×\` removes the corresponding line from the textarea.
+- Popover should NOT push the pill itself larger; it floats as an overlay.
+
+Layout:
+- \`PILL_HEIGHT_WITH_TITLE\` only needs to grow by ~38px (one row), not more — no dynamic resize needed.
+- The popover requires the BrowserWindow to be tall enough to show it, OR the popover renders as a separate frameless BrowserWindow (similar to how \`captureMicWindow\` is structured in \`electron/capture.ts\`). The separate-window approach is more robust because the pill window has \`overflow: hidden\` styling and a small fixed size; a child window avoids fighting with that.
+
+Wiring:
+- Same finalize payload: \`{ userTitle, attendees: string[] }\`.
+
+Tradeoffs to know:
+- Cleanest pill (the row stays tiny no matter how many attendees) but adds a click before you can edit. Hides complexity.
+- Most code if the popover is implemented as a separate BrowserWindow (matches the mic-picker pattern); less code if it's an in-window overlay (but fights with the pill's \`overflow: hidden\`).`,
+  };
+
+  function updatePrompt() {
+    const txt = document.getElementById('promptText');
+    if (state.variant == null) {
+      txt.textContent = 'Pick a variant above to see the implementation prompt.';
+      return;
+    }
+    txt.textContent = PROMPTS[state.variant];
+  }
+
+  // Wire controls
+  document.querySelectorAll('#seg-state button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#seg-state button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.fillState = btn.dataset.val;
+      renderMocks();
+    });
+  });
+  document.querySelectorAll('#seg-theme button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#seg-theme button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.theme = btn.dataset.val;
+      renderMocks();
+    });
+  });
+  document.querySelectorAll('#seg-popover button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#seg-popover button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.popover = btn.dataset.val;
+      renderMocks();
+    });
+  });
+
+  document.querySelectorAll('.variant-card').forEach(card => {
+    card.addEventListener('click', () => {
+      state.variant = parseInt(card.dataset.variant, 10);
+      renderPicks();
+      updatePrompt();
+    });
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    const txt = document.getElementById('promptText').textContent;
+    try {
+      await navigator.clipboard.writeText(txt);
+      const btn = document.getElementById('copyBtn');
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove('copied');
+      }, 1200);
+    } catch {}
+  });
+
+  // Initial render
+  renderMocks();
+  renderPicks();
+  updatePrompt();
+</script>
+</body>
+</html>

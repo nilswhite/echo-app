@@ -1,47 +1,51 @@
 # Agent Handoff
 
-_Last updated: 2026-07-08. Snapshot of repo state for a fresh agent._
+_Last updated: 2026-11-01. Snapshot of repo state for a fresh agent._
 
 ## Project State Summary
 
-- Echo is a tray-resident macOS meeting recorder (Electron + local Express server). Shipped MVP is v1.0.2; CHANGELOG describes through v1.2.2.
-- **Branch `feature/user-notes-and-reliability`** is committed and pushed (3 commits ahead of `origin/main`, 0 behind). Working tree clean. No PR opened yet.
-- **ID-005 "User Notes" — DONE, verified, closed 2026-06-20.** A single **Notes** button on the recording pill (attendee-count badge) expands the pill in place into a portrait window: title + attendees + free-form "Your notes" inline, pill controls (mic, volume bars, timer, stop, expand) pinned on top. Old attendees popover deleted; attendee parsing + People-folder resolution run inline in `capture.html`.
-- Notes flow end-to-end: finalize POST → store (`Recording.userNotes`) → job runner → structurer (HIGH-PRIORITY `User notes:` block) → `obsidian-writer` writes verbatim `## My Notes` before `## Transcript`, on every job path.
-- **ID-006 (closed 2026-06-17):** Mission Control killed recordings; fixed with `backgroundThrottling: false` on the capture window (Web Audio `AudioContext` suspended when occluded).
-- **Transcription duration-chunking fix (this session, 2026-07-08):** long-but-small recordings (low-bitrate Opus stays under the 25 MB size gate at 90+ min) were sent as a single request and failed — flat model "request timed out", diarize model "exceeded the 1400s model cap". Chunking now triggers on duration (>1200s) as well as file size, reusing the existing 300s ffmpeg chunk path.
+- Echo is a tray-resident macOS meeting recorder (Electron + local Express server).
+- **v1.3.0 is released.** Tagged `v1.3.0` on `main` (commit `3f7e8a9`) and published as the Latest GitHub release with `Echo.dmg` attached: https://github.com/nilswhite/echo-app/releases/tag/v1.3.0
+- Version numbers now agree everywhere: `package.json`, `package-lock.json`, `CHANGELOG.md`, and the README Status section all say 1.3.0. Before this release, `package.json` said 1.2.2, the lockfile said 1.1.1, and the newest git tag was `v1.0.2`.
+- GitHub releases exist only for v1.0.0, v1.0.1, v1.0.2, and v1.3.0. Versions 1.0.3 through 1.2.2 appear in the CHANGELOG but were never tagged or released; the v1.3.0 release notes summarize them.
+- The earlier `feature/user-notes-and-reliability` branch has been merged into `main` and no longer exists. `main` is the only branch, and there are no open PRs.
+- What 1.3.0 contains (details in `CHANGELOG.md`):
+  - **ID-005 User Notes (closed 2026-06-20).** A Notes button on the recording pill expands it into a taller window with title, attendees, and a notes box. Notes go through finalize POST → `Recording.userNotes` → job runner → structurer (high-priority `User notes:` block) → `obsidian-writer`, which writes them verbatim as `## My Notes` above `## Transcript`.
+  - **ID-006 Mission Control fix (closed 2026-06-17).** `backgroundThrottling: false` on the capture window, so the Web Audio `AudioContext` isn't suspended when the window is hidden.
+  - **Duration-based transcription chunking.** Recordings longer than 1200s are split into 300s ffmpeg chunks even when the file is under the 25 MB size limit. This fixes timeouts on `gpt-4o-transcribe` and the 1400s input cap on `gpt-4o-transcribe-diarize`.
+- The user has been running a July 8 build (reports itself as 1.2.2) day to day, built from the same code as 1.3.0. They consider 1.3.0 ready to use and are installing it from the GitHub release on a second Mac.
 
-## Key Files Touched
+## Key Files
 
-- `server/services/transcription-service.ts` — `SINGLE_REQUEST_DURATION_LIMIT = 1200`, `TranscriptionOptions.durationSeconds`, duration-OR-size chunking gate
-- `server/services/recording-job-runner.ts` — threads `rec.durationSeconds` into `transcribeAudio`
-- `electron/capture.ts` — pill/notes window sizing, `capture:notes-toggle` stepped tween, `backgroundThrottling:false`
-- `electron/capture.html` — pill Notes button, inline notes panel, attendee resolution
-- `electron/preload.ts` / `preload.js` — `toggleNotes`, `resolveAttendees`
-- `electron/settings.ts` — removed `getCaptureAttendeesWindow` theme-broadcast hook
-- `server/routes/recordings.ts`, `server/services/recording-store.ts`, `server/services/markdown-structurer.ts`, `server/services/obsidian-writer.ts`
-- Deleted: `electron/capture-attendees.html`
-- Docs: `_docs/issue-backlog.md`, `_docs/development-tracker.md`, `_docs/agent-handoff.md`
+- `CHANGELOG.md` — release history; add a new section at the top for each release.
+- `package.json` / `package-lock.json` — keep both `version` fields in sync (the lockfile has two: lines 3 and 9).
+- `README.md` — the Status section names the current version and should be updated each release.
+- `forge.config.ts` — Electron Forge packaging (DMG maker, `LSUIElement`, asar unpack rules).
+- `scripts/build-electron.cjs` — esbuild bundle of the main process into `electron-dist/main.cjs`.
+- `server/services/transcription-service.ts`, `server/services/recording-job-runner.ts` — transcription and chunking.
+- `electron/capture.ts`, `electron/capture.html` — recording pill and notes window.
 
 ## Outstanding Work / Next Focus
 
-- **Verify transcription fix end-to-end:** needs a real >20-min recording + API key (flat and diarized paths) → confirm chunking engages and no timeout / 1400s-cap error.
-- **Optional recovery path:** recently-failed recordings preserved their audio on disk but there's no re-transcribe UI. A one-off "reprocess `rec_…`" script/button would recover them through the fixed pipeline.
-- **ID-007 (planned, not started):** recording durability — stream audio + notes to disk during capture, recover orphans on launch. Plan in `_docs/plans/id-007-durability.md`.
-- **Backlog (ordered, each depends on the prior):** ID-001 system audio → ID-002 dual-track → ID-003 diarization → ID-004 presenting-mode.
-- **PR:** branch is pushed; open a PR when ready (`gh pr create`) — GitHub offered the URL on push.
+- **Optional recovery path:** recordings that failed before the chunking fix still have their audio on disk, but there is no way to re-run transcription from the UI. A one-off "reprocess `rec_…`" script or button would recover them.
+- **ID-007 (planned, not started):** recording durability. Stream audio and notes to disk during capture and recover orphaned recordings on launch. Plan in `_docs/plans/id-007-durability.md`.
+- **Backlog (ordered, each depends on the one before):** ID-001 system audio capture → ID-002 dual-track recording → ID-003 diarization → ID-004 presenting mode. See `_docs/issue-backlog.md`.
+- **Not done:** code signing and notarization, auto-update, Intel build. Users must right-click → Open on first launch.
+
+## Release Process (as done for v1.3.0)
+
+1. Add a CHANGELOG section, bump `package.json` and both `package-lock.json` version fields, update README Status.
+2. `rm -rf out/make && npm run electron:make` → DMG at `out/make/Echo.dmg` (about 140 MB, arm64). Confirm with `PlistBuddy -c 'Print CFBundleShortVersionString' out/Echo-darwin-arm64/Echo.app/Contents/Info.plist`.
+3. Commit as `vX.Y.Z — <summary>`, then annotated tag `git tag -a vX.Y.Z -m "Echo vX.Y.Z — <summary>"`, then `git push origin main vX.Y.Z`.
+4. `gh release create vX.Y.Z out/make/Echo.dmg --title "Echo vX.Y.Z — <summary>" --notes-file <notes.md> --latest`. Previous release notes follow this layout: What Echo is, What is new, Install, Known limitations.
 
 ## Testing Notes
 
-- Build loop: `node scripts/build-electron.cjs` (esbuild bundle, exit 0) → `npm run electron:make` (DMG at `out/make/Echo.dmg`).
-- Latest DMG built 2026-07-08 09:24, 140 MB, includes the transcription fix.
-- `tsc --noEmit` adds **no new** errors over baseline (2 pre-existing: `electron/main.ts:78`, `server/routes/recordings.ts:40`). App ships via esbuild/tsx (no typecheck gate) — don't block on `tsc`.
-- Still needs a human (GUI + mic + API key): long-recording transcription chunking; ID-005 record→notes→Stop→`.md` has `## My Notes` + AI summary reflects notes; ID-006 Mission Control persistence.
-- `npm run dev` (`ELECTRON=1 electron .`) runs without a fresh `build:electron`.
+- `node scripts/build-electron.cjs` builds the main-process bundle; `npm run dev` (`ELECTRON=1 electron .`) runs without a fresh bundle.
+- `tsc --noEmit` has 2 pre-existing errors (`electron/main.ts:78`, `server/routes/recordings.ts:40`). The app ships through esbuild/tsx with no typecheck step, so don't block on `tsc`.
+- The v1.3.0 DMG was not launched after building, because the installed copy of Echo was running and a second instance wasn't started. The user is confident in it based on daily use of the same code.
 
 ## Git Notes
 
-- On `feature/user-notes-and-reliability`, pushed to origin, working tree clean.
-- **Repo git email set to `5048191+nilswhite@users.noreply.github.com`** (repo-local config only, global untouched) — GitHub blocks pushing the private gmail. New commits here use the noreply address automatically.
-- The 3 branch commits were re-authored to the noreply email to satisfy GitHub's push protection.
-- `out/` and `electron-dist/` are build output — gitignored, do not commit.
+- Repo-local git email is `5048191+nilswhite@users.noreply.github.com` (global config untouched). GitHub blocks pushes that expose the private gmail address, so keep using the noreply address.
+- `out/`, `electron-dist/`, `node_modules/`, and `.claude/settings.local.json` are gitignored. Don't commit them.

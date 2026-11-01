@@ -12,7 +12,7 @@ No bots in your meetings. No board, no database, no surface to babysit. Just cap
 
 ## Status
 
-**v1.2.2.** First build worth installing — and now with attendees. The chevron-expanded section under the pill has an Attendees row that opens a popover for typing names; matched against the `.md` files in your Obsidian "People" folder, names land as `[[wikilinks]]` in the note frontmatter and an `## Attendees` section, and the structurer uses them to make a "simple diarization" pass on the transcript (`**Name:**` prefixes where the speaker is clear). See [CHANGELOG.md](CHANGELOG.md) for the full release history and the [issue backlog](_docs/issue-backlog.md) for what's coming next (ScreenCaptureKit system-audio capture, dual-track recording, real diarization).
+**v1.3.0.** You can now type your own notes during a recording. The "Notes" button on the pill expands it into a window with the title, attendees, and a notes box, and your notes are written verbatim into a `## My Notes` section of the finished note. Attendee names are matched against the `.md` files in your Obsidian "People" folder and land as `[[wikilinks]]`, and recordings with attendees are transcribed with speaker labels. See [CHANGELOG.md](CHANGELOG.md) for the full release history and the [issue backlog](_docs/issue-backlog.md) for what's coming next (ScreenCaptureKit system-audio capture, dual-track recording, real diarization).
 
 ## Install
 

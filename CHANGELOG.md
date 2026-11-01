@@ -4,6 +4,15 @@ All notable changes to Echo are tracked in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Echo adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-11-01
+
+### Added
+- **User notes during a recording (ID-005)** — a "Notes" button on the recording pill expands it in place into a taller window with the title, attendees, and a free-form notes box. The pill controls stay pinned at the top. Whatever you type is sent along with the recording, given high priority by the structurer, and written verbatim into a `## My Notes` section of the note, above the transcript. The separate attendees popover window is gone; attendee entry and People-folder matching now happen inside the expanded pill.
+
+### Fixed
+- **Mission Control and Space switches still ended recordings (ID-006)** — the capture window's audio context was being suspended by Chromium's background throttling whenever the window was hidden behind a Mission Control swipe or a Space switch. The capture window is now created with `backgroundThrottling: false`, so recording continues no matter what the window's visibility is.
+- **Long recordings failed to transcribe** — chunking used to trigger only when the audio file was over 25 MB. Low-bitrate recordings can stay under that size even at 90+ minutes, so they were sent as a single request. That failed with a timeout on `gpt-4o-transcribe`, and with "exceeded the 1400s model cap" on `gpt-4o-transcribe-diarize`. Echo now also splits any recording longer than 20 minutes into 5-minute chunks.
+
 ## [1.2.2] — 2026-05-11
 
 ### Fixed

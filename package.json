@@ -1,7 +1,7 @@
 {
   "name": "echo",
   "productName": "Echo",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "private": true,
   "description": "Tray-resident meeting recorder that pipes structured Markdown into your Obsidian vault.",
   "license": "MIT",
